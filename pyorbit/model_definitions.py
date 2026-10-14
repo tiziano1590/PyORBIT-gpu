@@ -349,3 +349,162 @@ datatype_definition = {
 
 activity_datatype = ['H-alpha', 'FWHM', 'BIS', 'EWs', 'activity', 'Ca_HK', 'S_index']
 activity_noderivative = ['H-alpha', 'FWHM', 'EWs', 'Ca_HK', 'S_index']
+
+
+# ---------------------------------------------------------------------------
+# GPU allowlists (Round 1)
+#
+# `gpu: true` is "gate + guide": only models that are genuinely JAX-native are
+# allowed to run on the GPU. Everything else is rejected up-front by
+# pyorbit.common.gpu_backend.gate() with a message naming the JAX equivalent to
+# use instead. `gpu: false` (the default) leaves this entirely untouched.
+#
+# These sets hold *classes* (not YAML keywords): the keys of
+# ModelContainer.models / .common_models are PyORBIT's internal model names, but
+# the class -- not the name -- is what actually determines the compute backend.
+# ---------------------------------------------------------------------------
+
+GPU_ALLOWED_MODELS = {
+    # Keplerian RV / transit-time (JAX port in pyorbit.subroutines.kepler_exo_jax)
+    RVkeplerian,
+    ApodizedRVkeplerian,
+    TransitTimeKeplerian,
+
+    # pytransit transits (already JAX-native)
+    PyTransit_Transit,
+    PyTransit_Dynamical,
+    PyTransit_Transit_TTV,
+    PyTransit_Transit_TTV_Subset,
+    PyTransit_Transit_TTV_TClist,
+    PyTransit_Transit_TTV_Ancillary,
+
+    # tinygp Gaussian processes (already JAX-native)
+    TinyGaussianProcess_QuasiPeriodicActivity,
+    TinyGaussianProcess_QuasiPeriodicDerivativeActivity,
+    TinyGaussianProcess_QuasiPeriodicSquaredExponentialActivity,
+    TinyGaussianProcess_QuasiPeriodicCosineActivity,
+    TinyGaussianProcess_SHO,
+    TinyGaussianProcess_Matern32,
+    TinyGP_Multidimensional_QuasiPeriodicActivity,
+    TinyGP_Multidimensional_QuasiPeriodicCosineActivity,
+    TinyGP_Multidimensional_Matern32,
+    TinyGP_Multidimensional_QuasiPeriodicSquaredExponentialActivity,
+    TinyGP_MultiQuasiPeriodic_TrainedSquaredExponential_Activity,
+
+    # Trivial arithmetic per-dataset models (JAX-safe scalars)
+    Offset,
+    Jitter,
+    DilutionFactor,
+    LocalDilutionFactor,
+    NormalizationFactor,
+    LocalNormalizationFactor,
+    SubsetNormalizationFactor,
+}
+
+# Common objects are shared *parameter holders* (planets, star, limb darkening,
+# activity, etc.); none of them drives the GPU/CPU backend, so all of them are
+# allowed and the gate stays focused on the per-sample compute models above.
+GPU_ALLOWED_COMMON = {
+    CommonPlanets,
+    CommonActivity,
+    CommonPolynomialTrend,
+    CommonOffset,
+    CommonJitter,
+    CommonHarmonics,
+    CommonSinusoid,
+    CommonDilutionFactor,
+    CommonNormalizationFactor,
+    CommonStarParameters,
+    CommonCCFParameters,
+    CommonCheopsModelling,
+    CommonCorrelation,
+    CommonComplexCorrelation,
+    CommonDetrending,
+    LimbDarkening_Linear,
+    LimbDarkening_Quadratic,
+    LimbDarkening_SquareRoot,
+    LimbDarkening_Logarithmic,
+    LimbDarkening_Exponential,
+    LimbDarkening_Power2,
+    LimbDarkening_NonLinear,
+}
+
+# Friendly "use this JAX model instead" messages, keyed by the gated class, for
+# the classes rejected under `gpu: true`. (Classes absent from this dict still
+# get a sensible fallback message from gpu_backend._redirect_message.)
+GPU_REDIRECT = {
+    # george-based GPs -> tinygp
+    GaussianProcess_QuasiPeriodicActivity: 'use tinygp_quasiperiodic (tinygp) instead',
+    GaussianProcess_QuasiPeriodicActivity_Alternative: 'use tinygp_quasiperiodic (tinygp) instead',
+    GaussianProcess_QuasiPeriodicActivity_Derivative: 'use tinygp_quasiperiodic_derivative (tinygp) instead',
+    GaussianProcess_QuasiPeriodicCosineActivity: 'use tinygp_quasiperiodic_cosine (tinygp) instead',
+    GP_Framework_QuasiPeriodicActivity: 'use tinygp_quasiperiodic (tinygp) instead',
+    GP_Pyaneti_QuasiPeriodicActivity: 'use tinygp_quasiperiodic (tinygp) instead',
+    GP_Multidimensional_QuasiPeriodicActivity: 'use tinygp_multidimensional_quasiperiodic (tinygp) instead',
+    GP_Multidimensional_QuasiPeriodicActivity_Numba: 'use tinygp_multidimensional_quasiperiodic (tinygp) instead',
+
+    # celerite2 GPs -> tinygp
+    Celerite2_Granulation_Rotation: 'use a tinygp_* kernel instead',
+    Celerite2_Granulation_Oscillation_Rotation: 'use a tinygp_* kernel instead',
+    Celerite2_Rotation: 'use a tinygp_* kernel instead',
+    Celerite2_Matern32: 'use tinygp_matern32 instead',
+    Celerite2_SHO: 'use tinygp_sho instead',
+
+    # S+LEAF GPs -> tinygp
+    SPLEAF_ESP: 'use a tinygp_* kernel instead',
+    SPLEAF_ESP_slow: 'use a tinygp_* kernel instead',
+    SPLEAF_SHO: 'use tinygp_sho instead',
+    SPLEAF_Multidimensional_ESP: 'use a tinygp_multidimensional_* kernel instead',
+    SPLEAF_Multidimensional_ESP_slow: 'use a tinygp_multidimensional_* kernel instead',
+    SPLEAF_Multidimensional_ESP_devel: 'use a tinygp_multidimensional_* kernel instead',
+
+    # batman transits -> pytransit
+    Batman_Transit: 'use pytransit_transit instead',
+    Batman_Transit_TTV: 'use pytransit_transit_ttv instead',
+    Batman_Transit_TTV_Subset: 'use pytransit_transit_ttv_subset instead',
+    Batman_Transit_TTV_TClist: 'use pytransit_transit_ttv_tclist instead',
+    Batman_Transit_TTV_Ancillary: 'use pytransit_transit_ttv_ancillary instead',
+    Batman_Transit_RpRs_Subset: 'use pytransit_transit_ttv_subset instead',
+    Batman_Transit_Eclipse_PhaseCurve: 'use pytransit_transit instead',
+
+    # RML (numba / PyAstronomy / pyarome) -- no JAX backend in Round 1
+    RossiterMcLaughlin_Ohta: 'no JAX backend in Round 1 (CPU-only)',
+    RossiterMcLaughlin_Pyarome: 'no JAX backend in Round 1 (CPU-only)',
+    RossiterMcLaughlin_Precise: 'no JAX backend in Round 1 (CPU-only)',
+    RossiterMcLaughlin_Reloaded: 'no JAX backend in Round 1 (CPU-only)',
+    RossiterMcLaughlin_Reloaded_Faster: 'no JAX backend in Round 1 (CPU-only)',
+    RossiterMcLaughlin_Revolutions: 'no JAX backend in Round 1 (CPU-only)',
+    RossiterMcLaughlin_Revolutions_Faster: 'no JAX backend in Round 1 (CPU-only)',
+    RossiterMcLaughlin_MultiPlanets_Precise: 'no JAX backend in Round 1 (CPU-only)',
+
+    # starry-based thermal phase curve -- no JAX backend in Round 1
+    Spiderman_Thermal: 'not JAX-native in Round 1 (CPU-only)',
+
+    # TRADES N-body integrator -- not JAX-portable in Round 1
+    RVdynamical: 'the TRADES integrator is not JAX-portable in Round 1 (CPU-only)',
+    TransitTimeDynamical: 'the TRADES integrator is not JAX-portable in Round 1 (CPU-only)',
+    DynamicalIntegrator: 'the TRADES integrator is not JAX-portable in Round 1 (CPU-only)',
+
+    # numpy/scipy trends, sinusoids, correlation and related -- CPU-only in Round 1
+    PolynomialTrend: 'not JAX-native in Round 1 (CPU-only)',
+    SharedPolynomialTrend: 'not JAX-native in Round 1 (CPU-only)',
+    LocalPolynomialTrend: 'not JAX-native in Round 1 (CPU-only)',
+    SubsetPolynomialTrend: 'not JAX-native in Round 1 (CPU-only)',
+    Sinusoid: 'not JAX-native in Round 1 (CPU-only)',
+    LocalSinusoid: 'not JAX-native in Round 1 (CPU-only)',
+    SinusoidCommonPeriod: 'not JAX-native in Round 1 (CPU-only)',
+    SinusoidPolynomialModulation: 'not JAX-native in Round 1 (CPU-only)',
+    Harmonics: 'not JAX-native in Round 1 (CPU-only)',
+    LocalCorrelation: 'not JAX-native in Round 1 (CPU-only)',
+    LocalCorrelatedJitter: 'not JAX-native in Round 1 (CPU-only)',
+    ComplexCorrelation: 'not JAX-native in Round 1 (CPU-only)',
+    FullDetrending: 'not JAX-native in Round 1 (CPU-only)',
+    PolynomialDetrending: 'not JAX-native in Round 1 (CPU-only)',
+    ExponentialDetrending: 'not JAX-native in Round 1 (CPU-only)',
+    Detrending_Matern32: 'use tinygp_matern32 instead',
+    SpectralRotation: 'not JAX-native in Round 1 (CPU-only)',
+    SubsetSpectralRotation: 'not JAX-native in Round 1 (CPU-only)',
+    SubsetSpectralRotationPolynomial: 'not JAX-native in Round 1 (CPU-only)',
+    CheopsDetrending: 'not JAX-native in Round 1 (CPU-only)',
+    CheopsFactorModel: 'not JAX-native in Round 1 (CPU-only)',
+}

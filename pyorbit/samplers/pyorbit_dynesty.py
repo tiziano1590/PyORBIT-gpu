@@ -17,6 +17,8 @@ import multiprocessing
 import matplotlib.pyplot as plt
 from pyorbit.subroutines.common import np, nested_sampling_prior_compute
 
+import pyorbit.common.gpu_backend as gpu_backend
+
 __all__ = ["pyorbit_dynesty"]
 
 """
@@ -126,6 +128,15 @@ def pyorbit_dynesty(config_in, input_datasets=None, return_output=None, run_nest
 
     dlogz = mc.nested_sampling_parameters.get('dlogz', 0.01)
     use_threading_pool = mc.nested_sampling_parameters.get('use_threading_pool', True)
+
+    if gpu_backend.gpu_enabled() and use_threading_pool:
+        # Forking a worker after the parent has used CUDA is unsafe, and JAX
+        # already parallelizes on the GPU, so the multiprocessing pool adds
+        # hazard with little gain. Force the single-process path (both
+        # 'use_threading_pool' branches below take the no-pool route).
+        print('GPU enabled: single-process (use_threading_pool is ignored).')
+        print()
+        use_threading_pool = False
     pfrac_value = mc.nested_sampling_parameters.get('pfrac', 0.000)
     use_default = (mc.nested_sampling_parameters.get('default', False) | mc.nested_sampling_parameters.get('use_default', False))
 

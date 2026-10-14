@@ -48,6 +48,14 @@ class ModelContainer(object):
 
     def model_setup(self):
 
+        # GPU gate (Round 1): fail fast, before any model is initialized, if the
+        # fit contains a model that is not JAX-native. This is a strict no-op
+        # while the GPU is disabled (the default), so the CPU path is untouched.
+        # The check is by *class* (see pyorbit.common.gpu_backend.gate), which is
+        # robust to PyORBIT's internal model naming; under `gpu: true` a rejected
+        # model raises GPUSupportedModelError naming the JAX equivalent to use.
+        pyorbit.common.gpu_backend.gate(self.models, self.common_models)
+
         # Fixing back-compatibility issues within  v8 sub-versions
         if not hasattr(self, 'ordered_planets'):
             self.ordered_planets = {}

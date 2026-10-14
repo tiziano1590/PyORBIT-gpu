@@ -11,6 +11,8 @@ import os
 import sys
 import multiprocessing
 from time import time
+
+import pyorbit.common.gpu_backend as gpu_backend
 #__all__ = ["pyorbit_emcee"]
 
 
@@ -88,6 +90,14 @@ def pyorbit_emcee(config_in, input_datasets=None, return_output=None):
 
     print('parameters/safe_reload flag (must be True for tinygp): ', safe_reload)
     print()
+
+    if gpu_backend.gpu_enabled():
+        # Forking a worker after the parent has used CUDA is unsafe, and JAX
+        # already parallelizes on the GPU, so the multiprocessing pool adds
+        # hazard with little gain. Force the single-process path (the
+        # use_threading_pool guards below are disabled while the GPU is on).
+        print('GPU enabled: single-process (use_threading_pool is ignored).')
+        print()
 
     if reloaded_pyde or reloaded_emcee:
         previous_boundaries = mc.bounds
@@ -342,7 +352,7 @@ def pyorbit_emcee(config_in, input_datasets=None, return_output=None):
         print('PyDE running')
         sys.stdout.flush()
 
-        if mc.pyde_parameters['use_threading_pool']:
+        if mc.pyde_parameters['use_threading_pool'] and not gpu_backend.gpu_enabled():
             with multiprocessing.Pool(num_threads) as pool:
 
                 de = DiffEvol(
@@ -424,7 +434,7 @@ def pyorbit_emcee(config_in, input_datasets=None, return_output=None):
 
         for i in range(0, niter):
 
-            if mc.emcee_parameters['use_threading_pool']:
+            if mc.emcee_parameters['use_threading_pool'] and not gpu_backend.gpu_enabled():
                 with multiprocessing.Pool(num_threads) as pool:
                     sampler.pool = pool
                     population, prob, state = sampler.run_mcmc(
@@ -477,7 +487,7 @@ def pyorbit_emcee(config_in, input_datasets=None, return_output=None):
             state, sampler = emcee_simpler_load_from_cpickle(emcee_dir_output)
 
     else:
-        if mc.emcee_parameters['use_threading_pool']:
+        if mc.emcee_parameters['use_threading_pool'] and not gpu_backend.gpu_enabled():
             with multiprocessing.Pool(num_threads) as pool:
                 sampler.pool = pool
                 population, prob, state = sampler.run_mcmc(

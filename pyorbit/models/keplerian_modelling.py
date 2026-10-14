@@ -8,6 +8,53 @@ import pyorbit.subroutines.kepler_exo as kepler_exo
 
 from scipy.stats import norm
 
+from types import SimpleNamespace
+
+import pyorbit.common.gpu_backend as gpu_backend
+
+
+def _active_kepler():
+    """Dispatch the Keplerian / impact-parameter / apodization calls to the
+    active backend (Round 1 GPU enablement).
+
+    Returns a small namespace exposing the functions this module calls:
+
+        rv_deltabjd, rv_semiamplitude, meanlong_from_dTc,
+        deltaTc_from_meanlong, convert_rho_to_ars, convert_b_to_i, norm_pdf
+
+    * ``gpu: true``  -> the JAX variants from
+      ``pyorbit.subroutines.kepler_exo_jax`` and ``jax.scipy.stats.norm.pdf``.
+      ``kepler_exo_jax`` is imported **lazily** here so the CPU path never loads
+      a JAX-dependent module.
+    * ``gpu: false`` (the default) -> the numpy ``kepler_exo`` functions and
+      ``scipy.stats.norm.pdf`` exactly as before, so the CPU path is unchanged.
+
+    The two sets are numerically identical under x64 (see
+    ``development/gpu_cpu_parity.py``), so results do not depend on the backend.
+    """
+    if gpu_backend.gpu_enabled():
+        import jax
+        import pyorbit.subroutines.kepler_exo_jax as kepler_exo_jax
+        return SimpleNamespace(
+            rv_deltabjd=kepler_exo_jax.kepler_compute_rv_deltabjd_jax,
+            rv_semiamplitude=kepler_exo_jax.kepler_compute_rv_semiamplitude_jax,
+            meanlong_from_dTc=kepler_exo_jax.kepler_compute_meanlong_from_deltaTc_jax,
+            deltaTc_from_meanlong=kepler_exo_jax.kepler_compute_deltaTc_from_meanlong_jax,
+            convert_rho_to_ars=kepler_exo_jax.convert_rho_to_ars_jax,
+            convert_b_to_i=kepler_exo_jax.convert_b_to_i_jax,
+            norm_pdf=jax.scipy.stats.norm.pdf,
+        )
+    return SimpleNamespace(
+        rv_deltabjd=kepler_exo.kepler_compute_rv_deltabjd,
+        rv_semiamplitude=kepler_exo.kepler_compute_rv_semiamplitude,
+        meanlong_from_dTc=kepler_exo.kepler_compute_meanlong_from_deltaTc,
+        deltaTc_from_meanlong=kepler_exo.kepler_compute_deltaTc_from_meanlong,
+        convert_rho_to_ars=convert_rho_to_ars,
+        convert_b_to_i=convert_b_to_i,
+        norm_pdf=norm.pdf,
+    )
+
+
 class RVkeplerian(AbstractModel):
 
     def __init__(self, *args, **kwargs):
@@ -114,10 +161,12 @@ class RVkeplerian(AbstractModel):
 
     def compute(self, parameter_values, dataset, x0_input=None):
 
+        kx = _active_kepler()
+
         Omega = parameter_values.get('Omega', self.default_Omega)
 
         if self.use_time_inferior_conjunction:
-            mean_long = kepler_exo.kepler_compute_meanlong_from_deltaTc(parameter_values['P'],
+            mean_long = kx.meanlong_from_dTc(parameter_values['P'],
                                                 parameter_values['Tc'] - dataset.Tref,
                                                 parameter_values['e'],
                                                 parameter_values['omega'],
@@ -129,10 +178,10 @@ class RVkeplerian(AbstractModel):
 
             if self.compute_inclination:
                 if self.compute_semimajor_axis:
-                    parameter_values['a_Rs'] = convert_rho_to_ars(parameter_values['P'], 
+                    parameter_values['a_Rs'] = kx.convert_rho_to_ars(parameter_values['P'],
                                                                     parameter_values['density'])
 
-                parameter_values['i'] = convert_b_to_i(
+                parameter_values['i'] = kx.convert_b_to_i(
                     parameter_values['b'],
                     parameter_values['e'],
                     parameter_values['omega'],
@@ -145,16 +194,16 @@ class RVkeplerian(AbstractModel):
             elif self.use_stellar_scaled_mass:
                 planet_mass = parameter_values['M_Ms'] * parameter_values['mass']
 
-            rv_semiamplitude = kepler_exo.kepler_compute_rv_semiamplitude(parameter_values['mass'],
+            rv_semiamplitude = kx.rv_semiamplitude(parameter_values['mass'],
                                                                             planet_mass,
-                                                                            parameter_values['P'], 
+                                                                            parameter_values['P'],
                                                                             parameter_values['i'],
                                                                             parameter_values['e'])
         else:
             rv_semiamplitude = parameter_values['K']
 
         if x0_input is None:
-            return kepler_exo.kepler_compute_rv_deltabjd(dataset.x0,
+            return kx.rv_deltabjd(dataset.x0,
                                             rv_semiamplitude,
                                             parameter_values['P'],
                                             mean_long,
@@ -162,7 +211,7 @@ class RVkeplerian(AbstractModel):
                                             parameter_values['omega'],
                                             Omega)
         else:
-            return kepler_exo.kepler_compute_rv_deltabjd(x0_input,
+            return kx.rv_deltabjd(x0_input,
                                             rv_semiamplitude,
                                             parameter_values['P'],
                                             mean_long,
@@ -196,10 +245,12 @@ class ApodizedRVkeplerian(RVkeplerian):
 
     def compute(self, parameter_values, dataset, x0_input=None):
 
+        kx = _active_kepler()
+
         Omega = parameter_values.get('Omega', self.default_Omega)
 
         if self.use_time_inferior_conjunction:
-            mean_long = kepler_exo.kepler_compute_meanlong_from_deltaTc(parameter_values['P'],
+            mean_long = kx.meanlong_from_dTc(parameter_values['P'],
                                                 parameter_values['Tc'] - dataset.Tref,
                                                 parameter_values['e'],
                                                 parameter_values['omega'],
@@ -214,11 +265,11 @@ class ApodizedRVkeplerian(RVkeplerian):
             elif self.use_scaled_mass:
                 planet_mass = parameter_values['Me_Ms'] * parameter_values['mass'] / constants.Msear
             elif self.use_stellar_scaled_mass:
-                planet_mass = parameter_values['M_Ms'] * parameter_values['mass'] 
+                planet_mass = parameter_values['M_Ms'] * parameter_values['mass']
 
-            rv_semiamplitude = kepler_exo.kepler_compute_rv_semiamplitude(parameter_values['mass'],
+            rv_semiamplitude = kx.rv_semiamplitude(parameter_values['mass'],
                                                                             planet_mass,
-                                                                            parameter_values['P'], 
+                                                                            parameter_values['P'],
                                                                             90.0,
                                                                             parameter_values['e'])
         else:
@@ -227,14 +278,14 @@ class ApodizedRVkeplerian(RVkeplerian):
         if x0_input is None:
 
             # Apodization factor
-            apo_function = (norm.pdf(dataset.x,
+            apo_function = (kx.norm_pdf(dataset.x,
                                         parameter_values['apo_center'],
-                                        parameter_values['apo_timescale']) 
-                            / norm.pdf(parameter_values['apo_center'], 
+                                        parameter_values['apo_timescale'])
+                            / kx.norm_pdf(parameter_values['apo_center'],
                                         parameter_values['apo_center'],
                                         parameter_values['apo_timescale']))
 
-            return apo_function * kepler_exo.kepler_compute_rv_deltabjd(dataset.x0,
+            return apo_function * kx.rv_deltabjd(dataset.x0,
                                             rv_semiamplitude,
                                             parameter_values['P'],
                                             mean_long,
@@ -244,14 +295,14 @@ class ApodizedRVkeplerian(RVkeplerian):
         else:
 
             # Apodization factor
-            apo_function = (norm.pdf(dataset.x,
+            apo_function = (kx.norm_pdf(dataset.x,
                                         parameter_values['apo_center'],
-                                        parameter_values['apo_timescale']) 
-                            / norm.pdf(parameter_values['apo_center'], 
+                                        parameter_values['apo_timescale'])
+                            / kx.norm_pdf(parameter_values['apo_center'],
                                         parameter_values['apo_center'],
                                         parameter_values['apo_timescale']))
 
-            return apo_function * kepler_exo.kepler_compute_rv_deltabjd(dataset.x0,
+            return apo_function * kx.rv_deltabjd(dataset.x0,
                                             rv_semiamplitude,
                                             parameter_values['P'],
                                             mean_long,
@@ -291,6 +342,7 @@ class TransitTimeKeplerian(AbstractModel):
 
     def compute(self, parameter_values, dataset, x0_input=None):
 
+        kx = _active_kepler()
 
         #TODO check this function, I believe it's a bit crazy.... URGENT
         Omega = parameter_values.get('Omega', self.default_Omega)
@@ -300,7 +352,7 @@ class TransitTimeKeplerian(AbstractModel):
                 np.floor((parameter_values['Tc'] - dataset.Tref) / parameter_values['P']) * parameter_values['P']
         else:
             delta_T = dataset.Tref + \
-                      kepler_exo.kepler_compute_deltaTc_from_meanlong(parameter_values['P'],
+                      kx.deltaTc_from_meanlong(parameter_values['P'],
                                                       parameter_values['mean_long'],
                                                       parameter_values['e'],
                                                       parameter_values['omega'],
