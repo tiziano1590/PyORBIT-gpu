@@ -127,6 +127,7 @@ def pyorbit_dynesty(config_in, input_datasets=None, return_output=None, run_nest
 
 
     dlogz = mc.nested_sampling_parameters.get('dlogz', 0.01)
+    maxcall = mc.nested_sampling_parameters.get('maxcall', None)
     use_threading_pool = mc.nested_sampling_parameters.get('use_threading_pool', True)
 
     if gpu_backend.gpu_enabled() and use_threading_pool:
@@ -230,7 +231,7 @@ def pyorbit_dynesty(config_in, input_datasets=None, return_output=None, run_nest
                                                                 'prior_transform': False},
                                                             )
                     print('Running Dynamic Nested Sampling')
-                    dsampler_maxevidence.run_nested(checkpoint_file=save_checkpoint_maxevidence, dlogz_init=dlogz, wt_kwargs={'pfrac': pfrac_value})
+                    dsampler_maxevidence.run_nested(checkpoint_file=save_checkpoint_maxevidence, dlogz_init=dlogz, maxcall=maxcall, wt_kwargs={'pfrac': pfrac_value})
                     print()
                 else:
                     results_maxevidence = dsampler_maxevidence.results
@@ -258,7 +259,7 @@ def pyorbit_dynesty(config_in, input_datasets=None, return_output=None, run_nest
                                                         sample= mc.nested_sampling_parameters['sample'],
                                                         )
                 print('Running Dynamic Nested Sampling')
-                dsampler_maxevidence.run_nested(checkpoint_file=save_checkpoint_maxevidence, dlogz_init=dlogz, wt_kwargs={'pfrac': pfrac_value})
+                dsampler_maxevidence.run_nested(checkpoint_file=save_checkpoint_maxevidence, dlogz_init=dlogz, maxcall=maxcall, wt_kwargs={'pfrac': pfrac_value})
                 print()
             else:
                 results_maxevidence = dsampler_maxevidence.results
@@ -328,9 +329,9 @@ def pyorbit_dynesty(config_in, input_datasets=None, return_output=None, run_nest
 
                 print('Running Dynamic Nested Sampling')
                 if use_default:
-                    dsampler.run_nested(checkpoint_file=save_checkpoint)
+                    dsampler.run_nested(checkpoint_file=save_checkpoint, maxcall=maxcall)
                 else:
-                    dsampler.run_nested(checkpoint_file=save_checkpoint, dlogz_init=dlogz, wt_kwargs={'pfrac': pfrac_value})
+                    dsampler.run_nested(checkpoint_file=save_checkpoint, dlogz_init=dlogz, maxcall=maxcall, wt_kwargs={'pfrac': pfrac_value})
                 print()
             else:
                 results = dsampler.results
@@ -355,9 +356,9 @@ def pyorbit_dynesty(config_in, input_datasets=None, return_output=None, run_nest
 
             print('Running Dynamic Nested Sampling without parallelization')
             if use_default:
-                dsampler.run_nested(checkpoint_file=save_checkpoint)
+                dsampler.run_nested(checkpoint_file=save_checkpoint, maxcall=maxcall)
             else:
-                dsampler.run_nested(checkpoint_file=save_checkpoint, dlogz_init=dlogz, wt_kwargs={'pfrac': pfrac_value})
+                dsampler.run_nested(checkpoint_file=save_checkpoint, dlogz_init=dlogz, maxcall=maxcall, wt_kwargs={'pfrac': pfrac_value})
             print()
         else:
             results = dsampler.results

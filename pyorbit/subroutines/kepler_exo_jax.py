@@ -103,6 +103,14 @@ def kepler_compute_rv_deltabjd_jax(bjd_tref, rv_semiamplitude, period, mean_long
     omega = jnp.asarray(omega_deg) * constants.deg2rad
     Omega = jnp.asarray(Omega_deg) * constants.deg2rad
     MeAn = (2. * jnp.pi * (bjd_tref / period) + (mean_long * constants.deg2rad - omega - Omega)) % (2. * jnp.pi)
+    # Normalise MeAn to >=1-D up front. The eccentric branch routes it through
+    # kepler_E_jax -- which, like the numpy kepler_E, applies atleast_1d -- while
+    # the circular branch returns it directly. jax.lax.cond type-checks *both*
+    # branches at trace time and requires identical output shapes, so the raw
+    # `()` scalar the circular branch would otherwise return mismatches the
+    # eccentric branch's `(1,)`. Doing it here keeps both branches consistent for
+    # scalar (unit-test) and array (real sampling) inputs alike, changing no value.
+    MeAn = jnp.atleast_1d(MeAn)
 
     def circular(_):
         return (MeAn, jnp.asarray(0.), omega)

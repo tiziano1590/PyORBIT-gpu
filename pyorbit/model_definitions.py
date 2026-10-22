@@ -370,13 +370,10 @@ GPU_ALLOWED_MODELS = {
     ApodizedRVkeplerian,
     TransitTimeKeplerian,
 
-    # pytransit transits (already JAX-native)
-    PyTransit_Transit,
-    PyTransit_Dynamical,
-    PyTransit_Transit_TTV,
-    PyTransit_Transit_TTV_Subset,
-    PyTransit_Transit_TTV_TClist,
-    PyTransit_Transit_TTV_Ancillary,
+    # Explicit CUDA/JAX implementations; PyTransit defaults are CPU/Numba.
+    Batman_Transit,
+    SPLEAF_ESP,
+    SPLEAF_Multidimensional_ESP,
 
     # tinygp Gaussian processes (already JAX-native)
     TinyGaussianProcess_QuasiPeriodicActivity,
