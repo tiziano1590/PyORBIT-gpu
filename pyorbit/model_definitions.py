@@ -388,6 +388,9 @@ GPU_ALLOWED_MODELS = {
     TinyGP_Multidimensional_QuasiPeriodicSquaredExponentialActivity,
     TinyGP_MultiQuasiPeriodic_TrainedSquaredExponential_Activity,
 
+    # Polynomial trend (JAX-native Horner evaluation; see pyorbit.models.polynomial_trend)
+    PolynomialTrend,
+
     # Trivial arithmetic per-dataset models (JAX-safe scalars)
     Offset,
     Jitter,
@@ -483,7 +486,6 @@ GPU_REDIRECT = {
     DynamicalIntegrator: 'the TRADES integrator is not JAX-portable in Round 1 (CPU-only)',
 
     # numpy/scipy trends, sinusoids, correlation and related -- CPU-only in Round 1
-    PolynomialTrend: 'not JAX-native in Round 1 (CPU-only)',
     SharedPolynomialTrend: 'not JAX-native in Round 1 (CPU-only)',
     LocalPolynomialTrend: 'not JAX-native in Round 1 (CPU-only)',
     SubsetPolynomialTrend: 'not JAX-native in Round 1 (CPU-only)',
