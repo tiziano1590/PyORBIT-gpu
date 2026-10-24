@@ -43,7 +43,7 @@ class PyTransit_Transit(AbstractModel, AbstractTransit):
         if self.use_roadrunner:
             print('Using RoadRunner Model from PyTransit')
 
-        self._prepare_planetary_parameters(mc, **kwargs)
+        self._prepare_planet_parameters(mc, **kwargs)
         self._prepare_limb_darkening_coefficients(mc, **kwargs)
 
     def initialize_model_dataset(self, mc, dataset, **kwargs):
@@ -74,7 +74,7 @@ class PyTransit_Transit(AbstractModel, AbstractTransit):
         :return:
         """
 
-        self.update_parameter_values(parameter_values, dataset.Tref)
+        self.update_parameter_values(parameter_values)
 
         if parameter_values['i'] == 0.0:
             return 0.

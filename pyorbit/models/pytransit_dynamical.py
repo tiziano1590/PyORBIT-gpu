@@ -36,6 +36,7 @@ class PyTransit_Dynamical(AbstractModel, AbstractTransit, AbstractDynamical):
 
     def initialize_model(self, mc, **kwargs):
 
+        self.list_pams_common.update(['R_Rs']) # planet radius (in units of stellar radii)
 
         self.use_roadrunner = kwargs.get('use_roadrunner', True)
         if self.use_roadrunner:
@@ -43,13 +44,14 @@ class PyTransit_Dynamical(AbstractModel, AbstractTransit, AbstractDynamical):
 
         """ Planetary parameters initialization is taken care of by the Dynamical integration model"""
         self._prepare_dynamical_parameters(mc, **kwargs)
-        self._prepare_planetary_parameters(mc, **kwargs)
+        self._prepare_planet_parameters(mc, **kwargs)
 
         self._prepare_limb_darkening_coefficients(mc, **kwargs)
 
+        self.Tref = mc.Tref
+
     def initialize_model_dataset(self, mc, dataset, **kwargs):
         self._prepare_dataset_options(mc, dataset, **kwargs)
-
         if self.limb_darkening_model == 'power2':
             self.limb_darkening_model == 'power-2'
 
@@ -78,9 +80,11 @@ class PyTransit_Dynamical(AbstractModel, AbstractTransit, AbstractDynamical):
         if x0_input is None:
             t = np.asarray(dataset.x) # for convenience
         else:
-            t = np.asarray(x0_input + dataset.Tref) # add the reference time to the input time
+            t = np.asarray(x0_input + self.Tref) # add the reference time to the input time
 
         f0 = np.zeros_like(t) # create a model at 0.0 for all time points
+
+        #print(rp_rs, per, aRs, inc, ecc,w,transits, durations)
 
         """ compute half duration in days for all the transits of all the planets"""
         half_dur_d = durations * constants.min2day
@@ -90,7 +94,7 @@ class PyTransit_Dynamical(AbstractModel, AbstractTransit, AbstractDynamical):
         n_tra = np.sum(tra_in_t)
 
 
-        self.update_parameter_values(parameter_values, dataset.Tref)
+        self.update_parameter_values(parameter_values)
 
         if parameter_values['i'] == 0.0:
             return f0

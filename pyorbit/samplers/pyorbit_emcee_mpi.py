@@ -58,7 +58,7 @@ def pyorbit_emcee_mpi(config_in, input_datasets=None, return_output=None):
 
     try:
         mc, starting_point, population, prob, sampler_chain, \
-            sampler_lnprobability, _, theta_dict = \
+            sampler_lnprobability, _, theta_dict, prior = \
             emcee_load_from_cpickle(emcee_dir_output)
         #state, sampler = emcee_simpler_load_from_cpickle(emcee_dir_output)
         reloaded_emcee = True
@@ -105,6 +105,7 @@ def pyorbit_emcee_mpi(config_in, input_datasets=None, return_output=None):
         flatchain = emcee_flatchain(
             sampler_chain, mc.emcee_parameters['nburn'], mc.emcee_parameters['thin'])
         mc.model_setup()
+        mc.print_model_info()
         mc.initialize_logchi2()
 
         results_analysis.print_bayesian_info(mc)
@@ -169,6 +170,7 @@ def pyorbit_emcee_mpi(config_in, input_datasets=None, return_output=None):
 
         mc.model_setup()
         mc.boundaries_setup()
+        mc.print_model_info()
         mc.initialize_logchi2()
 
         results_analysis.print_bayesian_info(mc)
@@ -200,6 +202,14 @@ def pyorbit_emcee_mpi(config_in, input_datasets=None, return_output=None):
 
         log_priors, log_likelihood = mc.log_priors_likelihood(theta)
         return log_priors + log_likelihood
+
+    global log_priors_likelihood_blob
+    def log_priors_likelihood_blob(theta):
+
+        log_priors, log_likelihood = mc.log_priors_likelihood(theta)
+        return log_priors + log_likelihood, log_priors
+
+
 
     if reloaded_emcee:
         state, sampler = emcee_simpler_load_from_cpickle(emcee_dir_output)
@@ -365,7 +375,7 @@ def pyorbit_emcee_mpi(config_in, input_datasets=None, return_output=None):
         print()
     else:
         sampler = emcee.EnsembleSampler(
-            mc.emcee_parameters['nwalkers'], mc.ndim, log_priors_likelihood)
+            mc.emcee_parameters['nwalkers'], mc.ndim, log_priors_likelihood_blob)
 
     if mc.emcee_parameters['nsave'] > 0:
         print('Saving temporary steps')
@@ -380,7 +390,7 @@ def pyorbit_emcee_mpi(config_in, input_datasets=None, return_output=None):
                     sys.exit(0)
 
                 sampler.pool = pool
-                population, prob, state = sampler.run_mcmc(
+                population, prob, state, prior = sampler.run_mcmc(
                     population,
                     int(mc.emcee_parameters['nsave']),
                     thin=mc.emcee_parameters['thin'],
@@ -427,7 +437,7 @@ def pyorbit_emcee_mpi(config_in, input_datasets=None, return_output=None):
                 pool.wait()
                 sys.exit(0)
             sampler.pool = pool
-            population, prob, state = sampler.run_mcmc(
+            population, prob, state, prior = sampler.run_mcmc(
                 population,
                 nsteps_todo,
                 thin=mc.emcee_parameters['thin'],

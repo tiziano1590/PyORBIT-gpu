@@ -53,7 +53,7 @@ class PyTransit_Transit_TTV_Subset(AbstractModel, AbstractTransit):
         if self.use_roadrunner:
             print('Using RoadRunner Model from PyTransit')
 
-        self._prepare_planetary_parameters(mc, **kwargs)
+        self._prepare_planet_parameters(mc, **kwargs)
         self._prepare_limb_darkening_coefficients(mc, **kwargs)
 
         self.list_pams_common.discard('Tc')
@@ -151,7 +151,7 @@ class PyTransit_Transit_TTV_Subset(AbstractModel, AbstractTransit):
             else:
                 return x0_input * 0.
 
-        self.update_parameter_values(parameter_values, dataset.Tref)
+        self.update_parameter_values(parameter_values)
 
         if parameter_values['i'] == 0.0:
             return 0.

@@ -38,7 +38,7 @@ class Batman_Transit_RpRs_Subset(AbstractModel, AbstractTransit):
 
     def initialize_model(self, mc, **kwargs):
 
-        self._prepare_planetary_parameters(mc, **kwargs)
+        self._prepare_planet_parameters(mc, **kwargs)
         self._prepare_limb_darkening_coefficients(mc, **kwargs)
 
         self.code_options['nthreads'] = kwargs.get('nthreads', 1)
@@ -115,7 +115,7 @@ class Batman_Transit_RpRs_Subset(AbstractModel, AbstractTransit):
         :return:
         """
 
-        self.update_parameter_values(parameter_values, dataset.Tref)
+        self.update_parameter_values(parameter_values)
 
         for key, key_val in parameter_values.items():
             if np.isnan(key_val):

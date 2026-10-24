@@ -37,7 +37,7 @@ class Batman_Transit(AbstractModel, AbstractTransit):
 
     def initialize_model(self, mc, **kwargs):
 
-        self._prepare_planetary_parameters(mc, **kwargs)
+        self._prepare_planet_parameters(mc, **kwargs)
         self._prepare_limb_darkening_coefficients(mc, **kwargs)
 
         from pyorbit.common import gpu_backend
@@ -98,7 +98,7 @@ class Batman_Transit(AbstractModel, AbstractTransit):
         :return:
         """
         #t1_start = process_time()
-        self.update_parameter_values(parameter_values, dataset.Tref)
+        self.update_parameter_values(parameter_values)
 
         for key, key_val in parameter_values.items():
             if np.isnan(key_val):

@@ -2,14 +2,12 @@
 from pyorbit.subroutines.common import *
 from pyorbit.models.abstract_model import AbstractModel
 import pyorbit.subroutines.kepler_exo as kepler_exo
+from pyorbit.subroutines.transformations import *
 
 try:
     from pytrades import pytrades
 except (ModuleNotFoundError,ImportError):
     pass
-
-
-#import time
 
 class AbstractDynamical(object):
 
@@ -20,95 +18,23 @@ class AbstractDynamical(object):
             'P',     # Period in days
             'Omega', # longitude of ascending node
             'e',     # eccentricity, uniform prior - to be fixed
-            'R_Rs',  # planet radius (in units of stellar radii)
+            #'R_Rs',  # planet radius (in units of stellar radii)
             'omega', # argument of pericenter
             #'i',     # inclination in degrees
         ])
 
         self.list_pams_dataset = OrderedSet()
-        self.warning_given = False
         self.dynamical_model = True
 
     # brainless workaround
     def _prepare_dynamical_parameters(self, mc, **kwargs):
 
-        print("*** {0:s} global parameters:".format(self.model_name))
-
-
-        if mc.common_models[self.planet_ref].parametrization[:8] == 'Ford2006' \
-            and mc.common_models[self.planet_ref].orbit != 'circular':
-            self.list_pams_common.discard('e')
-            self.list_pams_common.discard('omega')
-
-            self.list_pams_common.update(['e_coso'])
-            self.list_pams_common.update(['e_sino'])
-
-        elif mc.common_models[self.planet_ref].parametrization[:8] != 'Standard' \
-            and mc.common_models[self.planet_ref].orbit != 'circular':
-                # 'Eastman2013' is the standard choice
-            self.list_pams_common.discard('e')
-            self.list_pams_common.discard('omega')
-
-            self.list_pams_common.update(['sre_coso'])
-            self.list_pams_common.update(['sre_sino'])
-
-        try:
-            multivariate_pams = mc.common_models[self.stellar_ref].multivariate_pams
-        except AttributeError:
-            multivariate_pams = []
-
-        if not mc.common_models[self.planet_ref].use_mass \
-            and not mc.common_models[self.planet_ref].use_scaled_mass \
-            and not mc.common_models[self.planet_ref].use_stellar_scaled_mass:
-
-            print("UNRECOVERABLE ERROR model {0:s} :".format(self.model_name))
-            print('    Dynamical modelling requires the mass or the scaled mass of the planet as free parameters')
-            print('    for efficient exploration of parameter space')
-            quit()
-
-        if mc.common_models[self.planet_ref].use_mass:
-            self.list_pams_common.update(['M_Me'])
-
-        if mc.common_models[self.planet_ref].use_scaled_mass:
-            self.list_pams_common.update(['Me_Ms'])
-
-        if mc.common_models[self.planet_ref].use_stellar_scaled_mass:
-            self.list_pams_common.update(['M_Ms'])
-
-        try:
-            multivariate_pams = mc.common_models[self.stellar_ref].multivariate_pams
-        except AttributeError:
-            multivariate_pams = []
-
-        if 'mass' in multivariate_pams and 'radius' in multivariate_pams:
-            self.list_pams_common.update(['mass'])
-            self.list_pams_common.update(['radius'])
-        elif mc.common_models[self.stellar_ref].compute_density:
-            self.list_pams_common.update(['mass'])
-            self.list_pams_common.update(['radius'])
-        elif mc.common_models[self.stellar_ref].compute_mass:
-            self.list_pams_common.update(['density'])
-            self.list_pams_common.update(['radius'])
-        elif mc.common_models[self.stellar_ref].compute_radius:
-            self.list_pams_common.update(['density'])
-            self.list_pams_common.update(['mass'])
-
-
-        if mc.common_models[self.planet_ref].use_inclination:
-            """ i is the orbital inclination (in degrees) """
-            self.list_pams_common.update(['i'])
-            self.compute_inclination = False
-        else:
-            """ b is the impact parameter """
-            self.list_pams_common.update(['b'])
-            self.compute_inclination = True
-
-
-        if mc.common_models[self.planet_ref].use_time_inferior_conjunction:
-            self.list_pams_common.update(['Tc'])
-        else:
-            self.list_pams_common.update(['mean_long'])
-
+        _prepare_planet_parametrization(self, mc, **kwargs)
+        _prepare_planet_scaled_semimajor_axis(self, mc, **kwargs)
+        _prepare_planet_mass(self, mc, **kwargs)
+        _prepare_stellar_mass(self, mc, **kwargs)
+        _prepare_planet_inclination(self, mc, **kwargs)
+        _prepare_planet_time_inferior_conjunction(self, mc, **kwargs)
 
 class RVdynamical(AbstractModel, AbstractDynamical):
     model_class = 'radial_velocities'
@@ -139,18 +65,17 @@ class DynamicalIntegrator:
         self.dynamical_integrator = 'TRADES'
 
         self.dynamical_set = {}
-        self.rv_dataset_idbool = {}
         self.t0_planet_idflag = {}
         self.planet_idflag = {}
 
         self.to_be_initialized = True
 
-        print("    {0:s} WARNING:".format(self.model_name))
-        print('        Dynamical modelling requires the use of the stellar mass')
-        print('        This may cause a clash with models requiring stellar density and radius, e.g., RM modelling')
-        print('        The use of a multivariate approach is strongly suggested')
-        print('        You can control the behaviour of mass/radius/density with the specific keywords')
-        print('        compute_mass, compute_radius, compute_density')
+        print("+++ {0:s} WARNING:".format(self.model_name))
+        print('    Dynamical modelling requires the use of the stellar mass')
+        print('    This may cause a clash with models requiring stellar density and radius, e.g., RM modelling')
+        print('    The use of a multivariate approach is strongly suggested')
+        print('    You can control the behaviour of mass/radius/density with the specific keywords')
+        print('    compute_mass, compute_radius, compute_density')
         print()
 
     def compute(self, mc, theta, x_input=None, *args, **kwargs):
@@ -194,13 +119,7 @@ class DynamicalIntegrator:
             elif dataset.kind == 'transit_time':
                 int_buffer['t0_time'].extend(dataset.x.tolist())
 
-        """ Creating the flag array after all the RV epochs have been mixed
-        """
-        for dataset_name, dataset in mc.dataset_dict.items():
-            if dataset.dynamical is False: continue
-            if dataset.kind == 'radial_velocity':
-                self.rv_dataset_idbool[dataset_name] = \
-                    (np.asarray(int_buffer['rv_ref']) == int_buffer['key_ref'][dataset_name])
+        self.dataset_key_ref = int_buffer['key_ref']
 
         try:
             rv_minmax = [np.amin(int_buffer['rv_time']), np.amax(int_buffer['rv_time'])]
@@ -241,6 +160,7 @@ class DynamicalIntegrator:
 
         self.rv_epochs_argsort = np.argsort(int_buffer['rv_time'])
         self.rv_epochs = np.asarray(int_buffer['rv_time'], dtype=np.float64)[self.rv_epochs_argsort]
+        self.rv_epochs_reference = np.asarray(int_buffer['rv_ref'])
 
         pytrades.args_init(
             self.n_body, # mandatory
@@ -337,7 +257,7 @@ class DynamicalIntegrator:
 
             parameter_values = mc.common_models[planet_name].convert(theta)
             parameter_values.update(star_parameters)
-            mc.common_models[planet_name].update_parameter_values_for_dynamical(parameter_values, self.ti_ref)
+            mc.common_models[planet_name].update_parameter_values_for_dynamical(parameter_values)
 
             if self.tc_comparison_set[planet_name] is not None:
                 new_idx =  np.round((self.tc_comparison_set[planet_name][:,1] - parameter_values['Tc'])/parameter_values['P'])
@@ -353,7 +273,7 @@ class DynamicalIntegrator:
                 self.dynamical_pams['R'][n_plan-1] = parameter_values['R_Rs'] * self.dynamical_pams['R'][0]
             else:
                 """ Default value: slightly more than 1 Earth radii in Solar units"""
-                self.dynamical_pams['R'][n_plan-1] = 0.01
+                self.dynamical_pams['R'][n_plan-1] = 0.001
 
             if mc.common_models[planet_name].use_scaled_mass:
                 """ Converting the mass from Stellar units to Solar units"""
@@ -453,7 +373,10 @@ class DynamicalIntegrator:
 
             if dataset.kind == 'radial_velocity':
                 if x_input is None:
-                    output[dataset_name] = rv_sorted[self.rv_dataset_idbool[dataset_name]]
+
+                    sel = (self.rv_epochs_reference == self.dataset_key_ref[dataset_name])
+
+                    output[dataset_name] = rv_sorted[sel]
                 else:
                     output[dataset_name] = rv_sorted
 
@@ -478,6 +401,7 @@ class DynamicalIntegrator:
                         'transits': transits[planet_selection],
                         'durations': durations[planet_selection],
                     }
+
 
             elif dataset.kind == 'transit_time' and dataset.planet_name in mc.dynamical_dict:
 

@@ -17,7 +17,6 @@ class ModelContainer(object):
         # Since the individual contribution of each planet cannot be disentagled, the output of
         # the dynamical integration cannot be associated to a model.
         self.dynamical_dict = {}
-        self.dynamical_t0_dict = {}
         self.dynamical_model = None
 
         self.dataset_dict = {}
@@ -25,6 +24,8 @@ class ModelContainer(object):
         # Dictionaries including the common models and data-specific models
         self.common_models = {}
         self.models = {}
+        #TODO: Added in PyORBIT version 12 beta
+        self.parent_models = {}
 
         self.include_priors = True
 
@@ -42,7 +43,7 @@ class ModelContainer(object):
         self.ndim = 0
         self.pam_names = ''
 
-        self.Tref = None
+        self.Tref = 2460000.000
 
         self.ordered_planets = {}
 
@@ -83,16 +84,48 @@ class ModelContainer(object):
                 model_conf = {}
 
             model.initialize_model(self, **model_conf)
+
+            #TODO: added in PyORBIT version 12 beta
+            model.initialize_model_parameters(self, **model_conf)
+
             model.change_parameter_status(self, **model_conf)
 
             for dataset_name in list(OrderedSet(model_conf) & OrderedSet(self.dataset_dict)):
                 model.initialize_model_dataset(
                     self, self.dataset_dict[dataset_name], **model_conf)
 
+        #TODO: added in PyORBIT version 12 beta
+        for model_name, model in self.parent_models.items():
+            try:
+                model_conf = model.model_conf
+                if model_conf is None:
+                    model_conf = {}
+            except:
+                model_conf = {}
+            model.initialize_model(self, **model_conf)
+
+            for dataset_name in list(OrderedSet(model_conf) & OrderedSet(self.dataset_dict)):
+                model.initialize_model_dataset(
+                    self, self.dataset_dict[dataset_name], **model_conf)
+
+
         if self.dynamical_model:
             self.dynamical_model.to_be_initialized = True
 
-            # self.dynamical_model.prepare(self)
+
+    def print_model_info(self):
+        for model_name, model in self.common_models.items():
+            if model.skip_print_info: continue
+            model.print_info()
+
+        for model_name, model in self.models.items():
+            if model.skip_print_info: continue
+            model.print_info()
+
+        for model_name, model in self.parent_models.items():
+            if model.skip_print_info: continue
+            model.print_info()
+
 
     def boundaries_setup(self):
         # This routine setup the boundary array and at the same time
@@ -135,6 +168,11 @@ class ModelContainer(object):
         self.priors = output_lists['priors']
         self.range = self.bounds[:, 1] - self.bounds[:, 0]
 
+        if any(self.range < 0.0):
+            print('UNRECOVERABLE ERROR from configuration file')
+            print('    Some parameter has lower bound greater than upper bound')
+            print()
+            quit()
 
     def initialize_logchi2(self):
 
@@ -271,6 +309,7 @@ class ModelContainer(object):
         """
         Constant term added either by dataset.model_logchi2() or gp.log_likelihood()
         """
+
         if not self.check_bounds(theta):
             if return_priors is False:
                 return -np.inf
@@ -281,6 +320,8 @@ class ModelContainer(object):
             """ check if any keyword ahas get the output model from the dynamical tool
             we must do it here because all the planet are involved"""
             dynamical_output = self.dynamical_model.compute(self, theta)
+
+            #print(dynamical_output['stable'], dynamical_output['pass'], dynamical_output['tc_check'])
 
             if not (dynamical_output['stable'] and dynamical_output['pass']):
                 if return_priors is False:
@@ -317,6 +358,8 @@ class ModelContainer(object):
             if not dataset.models:
                 continue
 
+            #TODO: Added in PyORBIT version 12 beta
+            multiple_planets_models = {}
             skip_loglikelihood = False
 
             for model_name in dataset.models:
@@ -325,20 +368,51 @@ class ModelContainer(object):
                     theta, dataset_name)
 
                 parameter_values = {}
+
                 for common_ref in self.models[model_name].common_ref:
                     parameter_values.update(
                         self.common_models[common_ref].convert(theta))
 
-                #TODO: remove try-except starting from PyORBIT version 12 !!
-                try:
-                    for planet_name in self.models[model_name].multiple_planets:
-                        parameter_values.update(
-                            self.common_models[planet_name].convert_with_name(theta, planet_name))
-                except TypeError:
-                    pass
+                #TODO: here, possible check for models requiring a secondary star
+                if getattr(self.models[model_name], 'requires_secondary_star', False):
+                    binary_ref = self.models[model_name].binary_ref
+                    parameter_values.update(
+                        self.common_models[binary_ref].convert_with_name(theta, 'bin'))
+
 
                 parameter_values.update(
                     self.models[model_name].convert(theta, dataset_name))
+
+                #** NEW in PyORBIT version 12
+                # dataset independent calculation for the model
+                # The dataset is passed only for keywords such as reference time and so
+
+                #TODO: Added in PyORBIT version 12 beta
+                if getattr(self.models[model_name], 'accept_multiple_planets', False):
+
+                    parent_model = self.models[model_name].parent_model
+                    planet_ref = self.models[model_name].planet_ref
+                    parameter_values.update(
+                            self.common_models[planet_ref].convert_with_name(theta, planet_ref))
+                    self.models[model_name].update_parameter_values(parameter_values, planet_ref)
+
+                    self.parent_models[parent_model].parameter_values.update(parameter_values)
+
+                    try:
+                        multiple_planets_models[parent_model].append(planet_ref)
+                    except KeyError:
+                        multiple_planets_models[parent_model] = [planet_ref]
+                    continue
+                else:
+                    self.models[model_name].precompute(parameter_values, dataset)
+
+
+                """ compute the log-likelihood for those models using external datasets,
+                    but only when multiple planets are not involved, otherwise the log-likelihood is computed at the parent model level"""
+                if getattr(self.models[model_name], 'external_dataset', False):
+                    skip_loglikelihood = True
+                    log_likelihood += self.models[model_name].compute_loglikelihood(parameter_values, dataset)
+                    continue
 
                 """ residuals will be computed following the definition in Dataset class
                     This section has never been tested
@@ -378,6 +452,9 @@ class ModelContainer(object):
                         parameter_values, dataset)
                     continue
 
+                #print('    Computing model: ', model_name, ' for dataset: ', dataset_name)
+                #print(dataset_name, dataset.kind, dataset.dynamical, self.models[model_name].dynamical_model)
+
                 if getattr(dataset, 'dynamical', False) and getattr(self.models[model_name], 'dynamical_model', False):
                     if dataset.kind == 'photometry' :
                         dataset.buffer_model = self.models[model_name].compute_dynamical(parameter_values, dataset, dynamical_output[dataset_name])
@@ -397,6 +474,31 @@ class ModelContainer(object):
                 else:
                     dataset.additive_model += self.models[model_name].compute(
                         parameter_values, dataset)
+
+            #TODO: Added in PyORBIT version 12 beta
+            for parent_model in multiple_planets_models:
+                planet_list = multiple_planets_models[parent_model]
+
+                self.parent_models[parent_model].precompute(planet_list, dataset)
+
+                if getattr(self.parent_models[parent_model], 'external_dataset', False):
+                    skip_loglikelihood = True
+                    log_likelihood += self.parent_models[parent_model].compute_loglikelihood(planet_list, dataset)
+                    continue
+
+                model_out = self.parent_models[parent_model].compute(planet_list, dataset)
+
+                if dataset.normalization_model is None and (self.parent_models[parent_model].unitary_model or self.parent_models[parent_model].normalization_model):
+                    dataset.normalization_model = np.ones(dataset.n, dtype=np.double)
+
+                if self.parent_models[parent_model].unitary_model:
+                    #print('CHOICE D ', model_name, self.models[model_name].random_number, np.shape(dataset.buffer_model), np.shape(dataset.unitary_model))
+                    dataset.unitary_model += model_out
+                elif self.parent_models[parent_model].normalization_model:
+                    dataset.normalization_model *= model_out
+                else:
+                    dataset.additive_model += model_out
+
 
             dataset.compute_model()
             dataset.compute_residuals()
@@ -472,10 +574,17 @@ class ModelContainer(object):
             log_likelihood = -np.inf
             log_priors = -np.inf
 
+        for model_name in self.models:
+            self.models[model_name].reset_precompute()
+
+        for parent_model in multiple_planets_models:
+            self.parent_models[parent_model].reset_precompute()
+
         #if self.dynamical_model is not None:
         #    if not (dynamical_output['stable'] and dynamical_output['pass']):
         #        log_likelihood = -np.inf
         #        log_priors = -np.inf
+
 
         if return_priors is False:
             return log_likelihood
@@ -672,7 +781,6 @@ class ModelContainer(object):
                 elif data_are_rvs:
                     log_likelihood += self.models[logchi2_gp_model].lnlk_compute(
                         parameter_values, dataset)
-                    print('data_are_rvs', data_are_rvs, log_likelihood)
 
                 if compute_gp_residuals:
                     dataset.residuals_for_regression -= self.models[logchi2_gp_model].sample_predict(parameter_values, dataset)
@@ -718,7 +826,6 @@ class ModelContainer(object):
         """ In case there is more than one GP model """
         for logchi2_gp_model in delayed_lnlk_computation:
             log_likelihood += self.models[logchi2_gp_model].lnlk_rvonly_compute()
-            print(logchi2_gp_model, log_likelihood)
 
         return log_likelihood
 

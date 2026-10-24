@@ -64,7 +64,7 @@ def pyorbit_emcee(config_in, input_datasets=None, return_output=None):
 
     try:
         mc, starting_point, population, prob, sampler_chain, \
-            sampler_lnprobability, _, theta_dict = \
+            sampler_lnprobability, _, theta_dict, prior = \
             emcee_load_from_cpickle(emcee_dir_output)
         reloaded_emcee = True
     except FileNotFoundError:
@@ -116,6 +116,7 @@ def pyorbit_emcee(config_in, input_datasets=None, return_output=None):
         flatchain = emcee_flatchain(
             sampler_chain, mc.emcee_parameters['nburn'], mc.emcee_parameters['thin'])
         mc.model_setup()
+        mc.print_model_info()
         mc.initialize_logchi2()
 
         results_analysis.print_bayesian_info(mc)
@@ -180,6 +181,7 @@ def pyorbit_emcee(config_in, input_datasets=None, return_output=None):
         mc.emcee_parameters['version'] = emcee.__version__[0]
 
         mc.model_setup()
+        mc.print_model_info()
         mc.boundaries_setup()
         mc.initialize_logchi2()
 
@@ -200,7 +202,6 @@ def pyorbit_emcee(config_in, input_datasets=None, return_output=None):
         sampled = 0
         nsteps_todo = mc.emcee_parameters['nsteps']
 
-    #TODO back-compatibility check, remove in version 12
     emcee_input_moves= mc.emcee_parameters.get('moves', 'stretch')
 
     if type(emcee_input_moves) == dict: 
@@ -229,6 +230,19 @@ def pyorbit_emcee(config_in, input_datasets=None, return_output=None):
         #print("--------Computation took {0:.16f} seconds".format(end - start))
 
         return log_priors + log_likelihood
+
+    global log_priors_likelihood_blob
+    def log_priors_likelihood_blob(theta):
+
+        #start = time.time()
+
+        log_priors, log_likelihood = mc.log_priors_likelihood(theta)
+        #end = time.time()
+        #print("--------Computation took {0:.16f} seconds".format(end - start))
+
+        return log_priors + log_likelihood, log_priors
+
+
 
     if reloaded_emcee:
         state, sampler = emcee_simpler_load_from_cpickle(emcee_dir_output)
@@ -425,7 +439,7 @@ def pyorbit_emcee(config_in, input_datasets=None, return_output=None):
         print()
     else:
         sampler = emcee.EnsembleSampler(
-            mc.emcee_parameters['nwalkers'], mc.ndim, log_priors_likelihood, moves=emcee_moves)
+            mc.emcee_parameters['nwalkers'], mc.ndim, log_priors_likelihood_blob, moves=emcee_moves)
 
     if mc.emcee_parameters['nsave'] > 0:
         print('Saving temporary steps')
@@ -437,7 +451,7 @@ def pyorbit_emcee(config_in, input_datasets=None, return_output=None):
             if mc.emcee_parameters['use_threading_pool'] and not gpu_backend.gpu_enabled():
                 with multiprocessing.Pool(num_threads) as pool:
                     sampler.pool = pool
-                    population, prob, state = sampler.run_mcmc(
+                    population, prob, state, prior = sampler.run_mcmc(
                         population,
                         int(mc.emcee_parameters['nsave']),
                         thin=mc.emcee_parameters['thin'],
@@ -445,7 +459,7 @@ def pyorbit_emcee(config_in, input_datasets=None, return_output=None):
                         progress=progress_bar,
                         skip_initial_state_check=emcee_skip_check)
             else:
-                population, prob, state = sampler.run_mcmc(
+                population, prob, state, prior = sampler.run_mcmc(
                     population,
                     int(mc.emcee_parameters['nsave']),
                     thin=mc.emcee_parameters['thin'],
@@ -490,7 +504,7 @@ def pyorbit_emcee(config_in, input_datasets=None, return_output=None):
         if mc.emcee_parameters['use_threading_pool'] and not gpu_backend.gpu_enabled():
             with multiprocessing.Pool(num_threads) as pool:
                 sampler.pool = pool
-                population, prob, state = sampler.run_mcmc(
+                population, prob, state, prior = sampler.run_mcmc(
                     population,
                     nsteps_todo,
                     thin=mc.emcee_parameters['thin'],
@@ -500,7 +514,7 @@ def pyorbit_emcee(config_in, input_datasets=None, return_output=None):
 
         else:
             print('Warning: NOT using threading, pool, performances will be slower')
-            population, prob, state = sampler.run_mcmc(
+            population, prob, state, prior = sampler.run_mcmc(
                 population,
                 nsteps_todo,
                 thin=mc.emcee_parameters['thin'],

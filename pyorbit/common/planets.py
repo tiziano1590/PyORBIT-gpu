@@ -246,6 +246,7 @@ class CommonPlanets(AbstractCommon):
         self.parametrization = 'Eastman2013'
 
         self.use_inclination = False
+        self.use_scaled_semimajor_axis = False
         self.use_semimajor_axis = False
         self.use_time_inferior_conjunction = False
         self.use_mass = False
@@ -263,13 +264,12 @@ class CommonPlanets(AbstractCommon):
         self.compute_time_inferior_conjunction = True
         self.compute_mass = False
         self.compute_mean_longitude = False
+        self.compute_scaled_semimajor_axis = True
         self.compute_semimajor_axis = True
-
+        self.compute_semimajor_axis_from_mass = False
+        self.compute_planet_mass = False
 
     def initialize_model(self, mc, **kwargs):
-
-        print("*** planet {0:s} global parameters:".format(self.common_ref))
-
 
         self.Tref = mc.Tref
 
@@ -279,11 +279,8 @@ class CommonPlanets(AbstractCommon):
         if self.orbit in self.orbit_list:
 
             if self.orbit == 'circular' or self.use_circular_orbit:
-                print('    orbital model: circular')
                 self.fix_list['e'] = np.asarray([0.000, 0.0000], dtype=np.double)
                 self.fix_list['omega'] = np.asarray([90.0, 0.0000], dtype=np.double)
-            else:
-                print('    orbital model: ', self.orbit)
 
         else:
             print("UNRECOVERABLE ERROR model {0:s} :".format(self.common_ref))
@@ -293,8 +290,6 @@ class CommonPlanets(AbstractCommon):
 
         self.parametrization = kwargs.get('parametrization', self.parametrization)
         if self.parametrization in self.parametrization_list:
-            print('    orbital parametrization: ', self.parametrization)
-
             if self.parametrization[-5:] == 'Tcent' or self.parametrization[-5:] == 'Tc':
                 self.use_time_inferior_conjunction = True
         else:
@@ -302,75 +297,49 @@ class CommonPlanets(AbstractCommon):
             print('    {0:s} parametrization not supported, check configuration file'.format(self.parametrization))
             quit()
 
+        self.use_scaled_semimajor_axis = kwargs.get('use_scaled_semimajor_axis', self.use_scaled_semimajor_axis)
+        if self.use_scaled_semimajor_axis:
+            self.compute_scaled_semimajor_axis = False
+
         self.use_semimajor_axis = kwargs.get('use_semimajor_axis', self.use_semimajor_axis)
         if self.use_semimajor_axis:
             self.compute_semimajor_axis = False
-            print('    semi-major axis replacing stellar density as a free parameter: ', True)
 
         self.use_inclination = kwargs.get('use_inclination', self.use_inclination)
         if self.use_inclination:
             self.compute_inclination = False
-            print('    inclination replacing impact parameter as a free parameter: ', True)
 
         self.use_mass = kwargs.get('use_mass', self.use_mass)
-        if self.use_mass :
-            print('    planetary mass replacing RV semi-amplitude as a free parameter: ', True)
-            print('        WARNING: You will need to use either inclination or impact parameter as free/fixed parameter')
 
-        try:
-            self.use_scaled_mass = kwargs.get('use_scaled_mass', self.use_scaled_mass)
-        except: 
-            #TODO: try-except to ensure back-compatibility, to be removed in PyORBIT version 12
-            self.use_scaled_mass = kwargs.get('use_scaled_mass', False)
-        if self.use_scaled_mass :
-            print('    scaled planetary mass replacing RV semi-amplitude as a free parameter: ', True)
-            print('        WARNING: You will need to use either inclination or impact parameter as free/fixed parameter')
-
-        try:
-            self.use_stellar_scaled_mass = kwargs.get('use_stellar_scaled_mass', self.use_stellar_scaled_mass)
-        except: 
-            #TODO: try-except to ensure back-compatibility, to be removed in PyORBIT version 12
-            self.use_stellar_scaled_mass = kwargs.get('use_stellar_scaled_mass', False)
-        if self.use_stellar_scaled_mass :
-            print('    scaled planetary mass in stellar unit replacing RV semi-amplitude as a free parameter: ', True)
-            print('        WARNING: You will need to use either inclination or impact parameter as free/fixed parameter')
-
+        self.use_scaled_mass = kwargs.get('use_scaled_mass', self.use_scaled_mass)
+ 
+        self.use_stellar_scaled_mass = kwargs.get('use_stellar_scaled_mass', self.use_stellar_scaled_mass)
 
 
         self.use_time_inferior_conjunction = kwargs.get('use_time_inferior_conjunction', self.use_time_inferior_conjunction)
         if self.use_time_inferior_conjunction:
             self.compute_time_inferior_conjunction = False
             self.compute_mean_longitude = True
-            print('    time of inferior conjunction replacing mean longitude as a free parameter: ', True)
         else:
             self.compute_time_inferior_conjunction = True
             self.compute_mean_longitude = False
-            print('    mean longitude as free parameter (non-transiting planets or dynamical model): ', True)
 
-        try:
-            self.use_longitude_of_nodes = kwargs.get('use_longitude_of_nodes', self.use_longitude_of_nodes)
-        except:
-            #TODO: try-except to ensure back-compatibility, to be removed in PyORBIT version 12
-            self.use_longitude_of_nodes = kwargs.get('use_longitude_of_nodes', False)
-        print('    longitude of ascending node as a free parameter: ', self.use_longitude_of_nodes)
+        self.use_longitude_of_nodes = kwargs.get('use_longitude_of_nodes', self.use_longitude_of_nodes)
 
         for use_shared_ttvs in keywords_shared_ttv:
             self.use_shared_ttvs = kwargs.get(use_shared_ttvs, self.use_shared_ttvs)
             if self.use_shared_ttvs:
-                print('    shared TTVs: ', self.use_shared_ttvs)
                 break
 
 
         for tc_list in keywords_tc_list:
             self.tc_list = kwargs.get(tc_list, None)
             if self.tc_list:
-                print('    list of times of inferior conjuctions: ', self.tc_list)
                 break
 
         for tc_flag in keywords_tc_flag:
             self.tc_flag = kwargs.get(tc_flag, None)
             if self.tc_flag:
-                print('    dataset flag of times of inferior conjuctions: ', self.tc_flag)
                 break
 
         if Version(mc.pyorbit_version) <= Version("11.1.0"):
@@ -378,8 +347,59 @@ class CommonPlanets(AbstractCommon):
         else:
             self.default_Omega = 180.00
 
-        print()
 
+    def print_info(self):
+        print("*** planet {0:s} global parameters:".format(self.common_ref))
+
+        if self.orbit == 'circular' or self.use_circular_orbit:
+            print('    orbital model: circular')
+        else:
+            print("    orbital model: ", self.orbit)
+        print("    orbital parametrization: ", self.parametrization)
+        if self.use_time_inferior_conjunction:
+            print("    time of inferior conjunction replacing mean longitude as a free parameter: ", self.use_time_inferior_conjunction)
+        else:
+            print('    mean longitude as free parameter (non-transiting planets or dynamical model): ', True)
+
+        print("    default longitude of ascending node (when fixed): ", self.default_Omega)
+
+        if self.use_scaled_semimajor_axis:
+            print("    scaled semi-major axis replacing stellar density as a free parameter: ", self.use_scaled_semimajor_axis)
+        if self.use_semimajor_axis:
+            print("    semi-major axis in AU replacing period as a free parameter: ", self.use_semimajor_axis)
+        if self.use_inclination:
+            print("    inclination replacing impact parameter as a free parameter: ", self.use_inclination)
+        if self.use_mass :
+            print("    planetary mass replacing RV semi-amplitude as a free parameter: ", self.use_mass)
+            print('        WARNING: You will need to use either inclination or impact parameter as free/fixed parameter')
+
+        if self.compute_semimajor_axis_from_mass:
+            print("    planetary semi-major axis computed from planet/star masses: ", self.compute_semimajor_axis_from_mass)
+            print("       WARNING: this flag should be true only if you are fitting for planetary masses")
+            print("                and stellar density is not a free/fixed parameter (e.g. as in transit fitting)")
+
+        if self.use_scaled_mass :
+            print('    scaled planetary mass replacing RV semi-amplitude as a free parameter: ', self.use_scaled_mass)
+            print('        WARNING: You will need to use either inclination or impact parameter as free/fixed parameter')
+
+        if self.use_stellar_scaled_mass :
+            print('    scaled planetary mass in stellar unit replacing RV semi-amplitude as a free parameter: ', True)
+            print('        WARNING: You will need to use either inclination or impact parameter as free/fixed parameter')
+
+        if self.use_longitude_of_nodes:
+            print("    longitude of ascending node as a free parameter: ", self.use_longitude_of_nodes)
+
+        if self.use_shared_ttvs:
+            print("    use of a single Tc for observations covering the same transit (TTVs): ", self.use_shared_ttvs)
+
+        if self.tc_list:
+            print('    list of times of inferior conjuctions: ', self.tc_list)
+
+        if self.tc_flag:
+                print('    dataset flag of times of inferior conjuctions: ', self.tc_flag)
+
+
+        print()
 
     def define_derived_parameters(self):
 
@@ -500,13 +520,64 @@ class CommonPlanets(AbstractCommon):
         return False
 
 
-    def update_parameter_values_for_dynamical(self, parameter_values, Tref, prepend=''):
+    def update_parameter_values_for_dynamical(self, parameter_values, input_prepend=''):
 
-        if self.compute_inclination:
+        if input_prepend == '':
+            prepend = ''
+        else:
+            prepend = input_prepend + '__'
+
+
+        if self.compute_semimajor_axis_from_mass and self.compute_scaled_semimajor_axis:
+
+            """ Inclination must be known if the mass has to be computed from the RV semi-amplitude """
+            if self.compute_planet_mass:
+                sin_i = abs(np.sin(parameter_values[prepend+"i"]*constants.deg2rad))
+                parameter_values[prepend+'M_Me'] = kepler_exo.kepler_get_planet_mass(
+                    parameter_values[prepend+'P'],
+                    parameter_values[prepend+'K'],
+                    parameter_values[prepend+'e'],
+                    parameter_values['mass'],
+                    approximation_limit=10,
+                    verbose=False) * constants.Msear / sin_i
+
+            parameter_values[prepend+'a_AU']= convert_PMsMp_to_a(
+                    parameter_values[prepend+'P'],
+                    parameter_values['mass'],
+                    parameter_values[prepend+'M_Me'])
+            parameter_values[prepend+'a_Rs'] = convert_a_to_ars(parameter_values[prepend+'a_AU'], parameter_values['radius'])
+
+            """ To compute the inclination from the impact parameter, the scaled semi-major axis must be known 
+                In this case, the scaled semimajor axis is derived from the mass of the planet and the mass of the star
+            """
+            if self.compute_inclination:
+                parameter_values[prepend+'i'] = convert_b_to_i(
+                    parameter_values[prepend+'b'], parameter_values[prepend+'e'],
+                    parameter_values[prepend+'omega'], parameter_values[prepend+'a_Rs'])
+
+        else:
+            if self.compute_inclination:
+                if self.compute_scaled_semimajor_axis:
+                    parameter_values[prepend+'a_Rs'] = convert_rho_to_ars(parameter_values[prepend+'P'], parameter_values['density'])
+                parameter_values[prepend+'i'] = convert_b_to_i(
+                    parameter_values[prepend+'b'], parameter_values[prepend+'e'], parameter_values[prepend+'omega'], parameter_values[prepend+'a_Rs'])
+
             if self.compute_semimajor_axis:
-                parameter_values[prepend+'a_Rs'] = convert_rho_to_ars(parameter_values[prepend+'P'], parameter_values['density'])
-            parameter_values[prepend+'i'] = convert_b_to_i(
-                parameter_values[prepend+'b'], parameter_values[prepend+'e'], parameter_values[prepend+'omega'], parameter_values[prepend+'a_Rs'])
+                if self.compute_scaled_semimajor_axis:
+                    parameter_values[prepend+'a_Rs'] = convert_rho_to_ars(parameter_values[prepend+'P'], parameter_values['density'])
+                parameter_values[prepend+'a_AU'] = convert_ars_to_a(parameter_values[prepend+'a_Rs'], parameter_values['radius'])
+
+            if self.compute_planet_mass:
+                """ Recompute the mass with the updated inclination """
+                sin_i = abs(np.sin(parameter_values[prepend+"i"]*constants.deg2rad))
+                parameter_values[prepend+'M_Me'] = kepler_exo.kepler_get_planet_mass(
+                    parameter_values[prepend+'P'],
+                    parameter_values[prepend+'K'],
+                    parameter_values[prepend+'e'],
+                    parameter_values['mass'],
+                    approximation_limit=10,
+                    verbose=False) * constants.Msear / sin_i
+
 
         if self.compute_time_inferior_conjunction:
             parameter_values[prepend+'Tc']= kepler_exo.kepler_compute_deltaTc_from_meanlong(
@@ -514,12 +585,25 @@ class CommonPlanets(AbstractCommon):
                 parameter_values[prepend+'mean_long'],
                 parameter_values[prepend+'e'],
                 parameter_values[prepend+'omega'],
-                parameter_values[prepend+'Omega']) + Tref
+                parameter_values[prepend+'Omega']) + self.Tref
 
         if self.compute_mean_longitude:
             parameter_values[prepend+'mean_long'] = kepler_exo.kepler_compute_meanlong_from_deltaTc(
                 parameter_values[prepend+'P'],
-                parameter_values[prepend+'Tc'] - Tref,
+                parameter_values[prepend+'Tc'] - self.Tref,
                 parameter_values[prepend+'e'],
                 parameter_values[prepend+'omega'],
                 parameter_values[prepend+'Omega'])
+
+            parameter_values[prepend+'Tperi'] = kepler_exo.kepler_compute_deltaTperi_from_deltaTc(
+                    parameter_values[prepend+'P'],
+                    parameter_values[prepend+'Tc'] - self.Tref,
+                    parameter_values[prepend+'e'],
+                    parameter_values[prepend+'omega'])
+        else:
+            parameter_values[prepend+'Tperi'] = kepler_exo.kepler_compute_deltaTperi_from_meanlong(
+                    parameter_values[prepend+'P'],
+                    parameter_values[prepend+'mean_long'],
+                    parameter_values[prepend+'e'],
+                    parameter_values[prepend+'omega'],
+                    parameter_values[prepend+'Omega'])

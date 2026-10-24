@@ -10,7 +10,7 @@ except (ModuleNotFoundError,ImportError):
     pass
 
 class RossiterMcLaughlin_Pyarome(AbstractModel, AbstractTransit):
-    model_class = 'rossiter_mclaughlin'
+    model_class = 'rossiter_mclaughlin_test'
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)  # this calls all constructors up to AbstractModel
@@ -32,34 +32,34 @@ class RossiterMcLaughlin_Pyarome(AbstractModel, AbstractTransit):
             'omega',  # argument of pericenter (in radians)
             'lambda', # Sky-projected angle between stellar rotation axis and normal of orbit plane [deg]
             'R_Rs',  # planet radius (in units of stellar radii)
+            #NEW Added in PyORBIT version 12
+            'macroturbulence',  # macroturbulence velocity (in km/s)
+            'instrumental_broadening',  # instrumental broadening (in km/s)
+            'measured_ccf_width',  # FWHM of the CCF (in km/s)
+            'quadratic_ld_c1',  # quadratic limb darkening coefficient c1
+            'quadratic_ld_c2',  # quadratic limb darkening coefficient c2
         ])
 
         self.arome_parameters = {}
-        self.model_class = 'rossiter_mclaughlin'
+        self.model_class = 'rossiter_mclaughlin_nold'
 
     def initialize_model(self, mc, **kwargs):
 
-        self._prepare_planetary_parameters(mc, **kwargs)
+        self._prepare_planet_parameters(mc, **kwargs)
         self._prepare_star_parameters(mc, **kwargs)
-        self._prepare_limb_darkening_coefficients(mc, **kwargs)
+        #self._prepare_limb_darkening_coefficients(mc, **kwargs)
 
-
-        self.arome_parameters['macroturbulence'] =  kwargs.get('macroturbulence', 1.0)
-        self.arome_parameters['instrumental_broadening'] =  kwargs.get('instrumental_broadening', 1.0)
         self.arome_parameters['measurement_technique'] =  kwargs.get('measurement_technique', 'ccf')
         if self.arome_parameters['measurement_technique'] not in ['ccf', 'iodine']:
             raise ValueError('{0:s} error: measurement_technique must be either "ccf" or "iodine"'.format(self.model_name))
 
-        try:
-            self.arome_parameters['measured_ccf_width'] =  kwargs.get('measured_ccf_width') / constants.sigma2FWHM
-        except (KeyError, TypeError):
-            raise ValueError('{0:s} error: must provide measured_ccf_width (FWHM) in km/s'.format(self.model_name))
 
-        print("*** {0:s} global parameters:".format(self.model_name))
+    def print_info(self):
+        print("*** model {0:s} parameters:".format(self.model_name))
         print('    Note: assumption of quadratic limb darkening for RML computation')
         for key, value in self.arome_parameters.items():
             print(f"        {key}: {value}")
-
+        print()
 
     def compute(self, parameter_values, dataset, x0_input=None):
         """
@@ -70,14 +70,11 @@ class RossiterMcLaughlin_Pyarome(AbstractModel, AbstractTransit):
         """
         #t1_start = process_time()
 
-        self.update_parameter_values(parameter_values, dataset.Tref)
+        self.update_parameter_values(parameter_values)
 
         for key, key_val in parameter_values.items():
             if np.isnan(key_val):
                 return 0.
-
-        ld_par = self._limb_darkening_coefficients(parameter_values)
-
 
         if x0_input is not None:
             x0 = x0_input
@@ -93,18 +90,16 @@ class RossiterMcLaughlin_Pyarome(AbstractModel, AbstractTransit):
                             1. * parameter_values['omega'],
                             1. * parameter_values['Tc']-dataset.Tref,
                             1. * parameter_values['a_Rs'],
-                            1. * ld_par[0],
-                            1. * ld_par[1],
-                            1. * self.arome_parameters['instrumental_broadening'],
+                            1. * parameter_values['quadratic_ld_c1'],
+                            1. * parameter_values['quadratic_ld_c2'],
+                            1. * parameter_values['instrumental_broadening'],
                             1. * parameter_values['v_sini'],
-                            1. * self.arome_parameters['measured_ccf_width'],
-                            1. * self.arome_parameters['macroturbulence'],
+                            1. * parameter_values['measured_ccf_width']/ constants.sigma2FWHM,
+                            1. * parameter_values['macroturbulence'],
                             2,
                             1. * parameter_values['R_Rs'])
         except RuntimeError:
             return -np.inf
-
-        #print('RV model', rv_model[2], rv_model[0]*1000.)
 
         if rv_model[2]!=0:
             return -np.inf

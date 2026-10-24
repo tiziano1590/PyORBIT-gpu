@@ -13,7 +13,7 @@ PyORBIT is a Bayesian fitting framework for exoplanet orbital parameters and ste
 pip install -e .
 pip install -r extra_requirements.txt   # optional extras: tinygp, celerite2, dynesty, ultranest, starry, PyDE, ...
 
-# Run an analysis (entry point installed by setup.py)
+# Run an analysis (entry point declared in pyproject.toml [project.scripts])
 pyorbit_run <sampler> <config_file.yaml>
 # equivalent: python PyORBIT_Run.py <sampler> <config_file.yaml>
 # samplers: pyde, optimize, emcee, emcee_mpi, zeus_legacy, dynesty, dynesty_static,
@@ -63,7 +63,7 @@ Parameters are sampled in transformed spaces: `Linear`, `Log_Natural`, `Log_Base
 
 - Version 11 behavior change (v11.2+): mean longitude = ω + Ω + M₀ at `Tref`, with default Ω = 180°. Results from v10 are not comparable.
 - `deprecated/` contains superseded model implementations — do not use or build on them.
-- Dependency pins are strict and version-sensitive (setup.py: `numpy==1.24.3`, `jax==0.4.31`, `jaxlib==0.4.31`; tinygp 0.3.0 requires Python 3.10). `extra_requirements.txt` has looser pins for optional features — install the base package first.
+- Packaging moved to `pyproject.toml` in v12 (upstream deleted `setup.py`). Base `dependencies` keep wide bounds (`numpy>=1.24.3,<2.0`, `jax>=0.4.31,<=0.6.2`, `tinygp==0.3.0`; tinygp 0.3.0 requires Python 3.10). The `[gpu]` extra (`pip install pyorbit-package[gpu]`) pins the CUDA JAX stack (`jax[cuda12]==0.6.2`) plus the JAX-native kernels (jaxoplanet, splEaF, cuPy, batman). `extra_requirements.txt` still lists looser pins for optional samplers — install the base package first.
 - The PyPI distribution is named `pyorbit-package` (the bare name `pyorbit` is taken by another package); the import name is `pyorbit`.
 - `PyORBIT_GetResults.py` is a symlink to `PyORBIT_Results.py`; both are thin wrappers around `pyorbit.pyorbit_results()`.
 - `pyorbit/__init__.py` is where sampler modules are exposed as `pyorbit.pyorbit_<sampler>`; new samplers must be added there and to the `sampler_keyword` table in `pyorbit_run.py` (and the matching table in `pyorbit_results.py`).

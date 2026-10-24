@@ -1,3 +1,5 @@
+from typing import Any
+
 #from pyorbit.common.dataset import Dataset
 from pyorbit.common.planets import CommonPlanets
 from pyorbit.common.activity import CommonActivity
@@ -27,6 +29,8 @@ from pyorbit.common.correlation import CommonCorrelation, CommonComplexCorrelati
 #from pyorbit.common.lightcurve_detrending import CommonLightcurveDetrending
 from pyorbit.common.detrending import CommonDetrending
 
+from pyorbit.common.spectrograph import CommonSpectrograph
+from pyorbit.common.exomoons import CommonExomoons
 
 from pyorbit.models.keplerian_modelling import  ApodizedRVkeplerian, RVkeplerian, TransitTimeKeplerian
 from pyorbit.models.dynamical_modelling import  TransitTimeDynamical, RVdynamical, DynamicalIntegrator
@@ -124,56 +128,31 @@ from pyorbit.models.spleaf_esp_activity import SPLEAF_ESP
 from pyorbit.models.spleaf_esp_activity_slow import SPLEAF_ESP_slow
 from pyorbit.models.spleaf_sho import SPLEAF_SHO
 
-from pyorbit.models.rossitermclaughlin_ohta import RossiterMcLaughlin_Ohta
 from pyorbit.models.rossitermclaughlin_pyarome import RossiterMcLaughlin_Pyarome
-from pyorbit.models.rossitermclaughlin_precise import RossiterMcLaughlin_Precise
+from pyorbit.models.rossitermclaughlin_legacy import RossiterMcLaughlin_Legacy
 from pyorbit.models.rossitermclaughlin_reloaded import RossiterMcLaughlin_Reloaded
 from pyorbit.models.rossitermclaughlin_reloaded_faster import RossiterMcLaughlin_Reloaded_Faster
 from pyorbit.models.rossitermclaughlin_revolutions import RossiterMcLaughlin_Revolutions
 from pyorbit.models.rossitermclaughlin_revolutions_faster import RossiterMcLaughlin_Revolutions_Faster
 
-from pyorbit.models.rossitermclaughlin_multiplanets_precise import RossiterMcLaughlin_MultiPlanets_Precise
 
-"""
- model_requires_planets: all those models that requires AT LEAST one of the planets in the system must be listed here
-    this is the case for dataset that contains the signature of multiple planets, e.g., RVs or transit light curve
- single_planet_model: the model is associated to a specific planet, e.g., time of transits
-"""
+from pyorbit.models.rossitermclaughlin_multiplanets_legacy import RossiterMcLaughlin_MultiPlanets_Legacy
 
-#model_requires_planets = ['radial_velocities', 'rv_planets',
-#                          'batman_transit', 'pytransit_transit',
-#                          'batman_transit_ttv', 'pytransit_transit_ttv',
-#                          'subset_batman_transit_ttv', 'batman_transit_ttv_subset',
-#                          'subset_batman_transit_faster_ttv', 'batman_transit_ttv_subset_faster',
-#                          'subset_pytransit_transit_ttv', 'pytransit_transit_ttv_subset',
-#                          'ancillary_pytransit_transit_ttv', 'pytransit_transit_ttv_ancillary',
-#                         'rossitermclaughlin_ohta','rossitermclaughlin_precise',
-#                         'rossitermclaughlin_reloaded','rossitermclaughlin_reloaded_faster',
-#                         'rossitermclaughlin_revolutions',
-#                         'spiderman_thermal', 'batman_transit_eclipse_phasecurve']
+#from pyorbit.models.orbitize import Orbitize
+from pyorbit.models.gaiadr4_full import GaiaDR4AstrometricFull
+from pyorbit.models.gaiadr4_baseline import GaiaDR4AstrometricBaseline
+from pyorbit.models.gaiadr4_orbit import GaiaDR4AstrometricOrbit
 
-model_requires_planets = ['radial_velocities', 'transit_times', 'transit',
-                                'transit_eclipse_phasecurve']
+from pyorbit.models.rossitermclaughlin_exomoon import RossiterMcLaughlin_Exomoon
 
-single_planet_model = ['Tc_planets', 'transit_times']
-transit_time_model = ['Tc_planets', 'transit_times']
-
-model_requires_limb_darkening = ['transit',
-                                'transit_eclipse_phasecurve',
-                                'spectral_rotation',
-                                'subset_spectral_rotation',
-                                'subset_spectral_rotation_polynomial',
-                                'rossiter_mclaughlin']
-
-model_requires_star = ['rossiter_mclaughlin', 'transit_times', 'gaussian_process', 'multidimensional_gaussian_process']
-model_requires_multiple_planets = ['rossiter_mclaughlin']
-
-define_common_type_to_class = {
+define_common_type_to_class: dict[str, type[Any]] = {
     'planets': CommonPlanets,
+    'exomoons': CommonExomoons,
     'activity': CommonActivity,
     'polynomial_trend': CommonPolynomialTrend,
     'common_offset': CommonOffset,
     'common_jitter': CommonJitter,
+    'spectrograph': CommonSpectrograph,
     'ccf_parameters': CommonCCFParameters,
     'sinusoid': CommonSinusoid,
     'harmonics': CommonHarmonics,
@@ -194,7 +173,7 @@ define_common_type_to_class = {
     'detrending': CommonDetrending,
 }
 
-define_type_to_class = {
+define_type_to_class: dict[str, type[Any] | dict[str, type[Any]]] = {
     'planetary_velocities': {'circular': RVkeplerian,
                           'keplerian': RVkeplerian,
                           'apodized': ApodizedRVkeplerian,
@@ -207,9 +186,6 @@ define_type_to_class = {
                    'keplerian': RVkeplerian,
                    'apodized': ApodizedRVkeplerian,
                    'dynamical': RVdynamical},
-    'Tc_planets': {'circular': TransitTimeKeplerian,
-                   'keplerian': TransitTimeKeplerian,
-                   'dynamical': TransitTimeDynamical},
     'transit_times': {'circular': TransitTimeKeplerian,
                       'keplerian': TransitTimeKeplerian,
                       'dynamical': TransitTimeDynamical},
@@ -305,14 +281,15 @@ define_type_to_class = {
     'spleaf_multidimensional_exponentialsineperiodic_slow': SPLEAF_Multidimensional_ESP_slow,
     'spleaf_multidimensional_esp': SPLEAF_Multidimensional_ESP,
     'spleaf_multidimensional_exponentialsineperiodic': SPLEAF_Multidimensional_ESP,
-    'rossitermclaughlin_ohta': RossiterMcLaughlin_Ohta,
     'rossitermclaughlin_pyarome': RossiterMcLaughlin_Pyarome,
     'rossitermclaughlin_arome': RossiterMcLaughlin_Pyarome,
-    'rossitermclaughlin_precise': RossiterMcLaughlin_Precise,
+    'rossitermclaughlin_legacy': RossiterMcLaughlin_Legacy,
     'rossitermclaughlin_reloaded': RossiterMcLaughlin_Reloaded,
     'rossitermclaughlin_reloaded_faster': RossiterMcLaughlin_Reloaded_Faster,
     'rossitermclaughlin_revolutions': RossiterMcLaughlin_Revolutions,
-    'rossitermclaughlin_multiplanets_precise': RossiterMcLaughlin_MultiPlanets_Precise,
+    'rossitermclaughlin_multiplanets_legacy': RossiterMcLaughlin_MultiPlanets_Legacy,
+    'rossitermclaughlin_exomoon': RossiterMcLaughlin_Exomoon,
+    'rml_exomoon': RossiterMcLaughlin_Exomoon,
     'polynomial_detrending': PolynomialDetrending,
     'exponential_detrending': ExponentialDetrending,
     'detrending': FullDetrending,
@@ -320,35 +297,52 @@ define_type_to_class = {
     'lightcurve_detrending': FullDetrending,
     'detrending_matern32': Detrending_Matern32,
     'matern32_detrending': Detrending_Matern32,
+    #'orbitize': Orbitize,
+    'gaiadr4_full': GaiaDR4AstrometricFull,
+    'gaiadr4_baseline': GaiaDR4AstrometricBaseline,
+    'gaiadr4_orbit': GaiaDR4AstrometricOrbit,
+    'gaiadr4_astrometric_baseline': GaiaDR4AstrometricBaseline,
+    'gaiadr4_astrometric_orbit': GaiaDR4AstrometricOrbit,
 }
 
-accepted_extensions = ['.yaml', '.yml', '.conf', '.config', '.input', ]
+
+"""
+ model_requires_planets: all those models that requires AT LEAST one of the planets in the system must be listed here
+    this is the case for dataset that contains the signature of multiple planets, e.g., RVs or transit light curve
+ single_planet_model: the model is associated to a specific planet, e.g., time of transits
+"""
+star_model_names = ['star', 'primary', 'secondary', 'tertiary', 'quaternary', 'quinary', 'senary']
+primary_model_names = ['primary',  'star']
+
+
+
+dynamical_timing_models = ['transit_times', 'transit_durations']
+
+model_requires_planets = ['radial_velocities', 'transit_times', 'transit_durations', 'transit', 'gaia_astrometry_orbit',
+                                'transit_eclipse_phasecurve', 'rossiter_mclaughlin','rossiter_mclaughlin_nold', 'rossiter_mclaughlin_exomoon']
+
+model_requires_limb_darkening = ['transit',
+                                'transit_eclipse_phasecurve',
+                                'rossiter_mclaughlin',
+                                'rossiter_mclaughlin_exomoon',
+                                'spectral_rotation',
+                                'subset_spectral_rotation',
+                                'subset_spectral_rotation_polynomial']
+
+model_requires_exomoon = ['rossiter_mclaughlin_exomoon']
+
+model_requires_star = ['rossiter_mclaughlin','rossiter_mclaughlin_nold', 'rossiter_mclaughlin_exomoon', 'transit_times', 'gaussian_process',
+                        'multidimensional_gaussian_process', 'gaia_astrometry_orbit', 'gaia_astrometry_baseline']
+
+model_requires_secondary_star = ['radial_velocities_primary', 'radial_velocities_secondary', 'eclipsing_binary']
+#model_requires_multiple_planets = ['rossiter_mclaughlin']
+
+model_requires_multiple_planets = []
+
+model_requires_spectrograph = ['rossiter_mclaughlin', 'rossiter_mclaughlin_nold', 'rossiter_mclaughlin_exomoon' ]
 
 star_properties_list = ['limb_darkening', 'dilution_factor']
 
-extended_dataset_keylist = ['expanded_dataset', 'extended_dataset', 'dataset_2d', 'dataset_expanded', 'dataset_extended', '2d_dataset']
-
-# Trying to guess all the possible mistakes....
-datatype_definition = {
-    'radial_velocity': ['RV', 'RVs', 'rv', 'rvs'],
-    'transit_time': ['transit_time', 'transit_times', 'Tcent', 'TCent', 'Tc', 'TC', 'T0', 'TT'],
-    'transit_duration': ['transit_duration', 'transit_durations', 'Tdur', 'TDur', 'Td', 'TD', 'T_dur', 'T_Dur'],
-    'astrometry': ['astrometry', 'Astrometry', 'AstroMetry', 'Astro', 'astro', 'AM', 'Gaia', 'gaia'],
-    'H-alpha': ['H', 'HA', 'h', 'ha', 'Halpha', 'H-alpha', 'halpha', 'h-alpha'],
-    'photometry': ['P', 'Ph', 'p', 'ph', 'PHOT', 'Phot', 'phot', 'Photometry', 'photometry'],
-    'FWHM': ['FWHM', 'fwhm'],
-    'BIS': ['BIS', 'bis'],
-    'EWs': ['EWs', 'EW', 'ew', 'ews'],
-    'activity': ['Activity', 'activity', 'act_index', 'Act_index', 'activity_index', 'Activity_index'],
-    'Ca_HK': ['Ca', 'Cahk', 'CaHK', 'Ca_hk', 'Ca_HK',
-              'logR', 'logRhk', 'logRHK', 'logR_hk', 'logR_HK',
-              'log(R)', 'log(Rhk)', 'log(RHK)', 'log(R_hk)', 'log(R_HK)'],
-    'S_index': ['S', 'S_index', 'Shk', 'SHK', 'S_HK', 'S_hk'],
-    'CCF': ['CCF', 'CCFs', 'ccf', 'ccfs']
-}
-
-activity_datatype = ['H-alpha', 'FWHM', 'BIS', 'EWs', 'activity', 'Ca_HK', 'S_index']
-activity_noderivative = ['H-alpha', 'FWHM', 'EWs', 'Ca_HK', 'S_index']
 
 
 # ---------------------------------------------------------------------------
@@ -468,14 +462,14 @@ GPU_REDIRECT = {
     Batman_Transit_Eclipse_PhaseCurve: 'use pytransit_transit instead',
 
     # RML (numba / PyAstronomy / pyarome) -- no JAX backend in Round 1
-    RossiterMcLaughlin_Ohta: 'no JAX backend in Round 1 (CPU-only)',
     RossiterMcLaughlin_Pyarome: 'no JAX backend in Round 1 (CPU-only)',
-    RossiterMcLaughlin_Precise: 'no JAX backend in Round 1 (CPU-only)',
+    RossiterMcLaughlin_Legacy: 'no JAX backend in Round 1 (CPU-only)',
     RossiterMcLaughlin_Reloaded: 'no JAX backend in Round 1 (CPU-only)',
     RossiterMcLaughlin_Reloaded_Faster: 'no JAX backend in Round 1 (CPU-only)',
     RossiterMcLaughlin_Revolutions: 'no JAX backend in Round 1 (CPU-only)',
     RossiterMcLaughlin_Revolutions_Faster: 'no JAX backend in Round 1 (CPU-only)',
-    RossiterMcLaughlin_MultiPlanets_Precise: 'no JAX backend in Round 1 (CPU-only)',
+    RossiterMcLaughlin_MultiPlanets_Legacy: 'no JAX backend in Round 1 (CPU-only)',
+    RossiterMcLaughlin_Exomoon: 'no JAX backend in Round 1 (CPU-only)',
 
     # starry-based thermal phase curve -- no JAX backend in Round 1
     Spiderman_Thermal: 'not JAX-native in Round 1 (CPU-only)',

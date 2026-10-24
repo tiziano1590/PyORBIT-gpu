@@ -132,7 +132,6 @@ class SharedPolynomialTrend(AbstractModel):
 
     def initialize_model(self, mc, **kwargs):
 
-        print("*** {0:s} global parameters:".format(self.model_name))
 
         self.order = kwargs.get('order', 1)
 
@@ -181,6 +180,9 @@ class SharedPolynomialTrend(AbstractModel):
                 self.common_poly_ref = common_ref
                 break
 
+    def print_info():
+
+        print("*** {0:s} global parameters:".format(self.model_name))
         print('    order: {0:3.0f}'.format(self.order))
         print('    starting order: {0:3.0f}'.format(self.starting_order))
         print('    time_interval:  {0:.6f}'.format(self.time_interval))

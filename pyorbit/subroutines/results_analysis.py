@@ -76,13 +76,13 @@ def results_summary(mc, theta,
         fixed_warning = True
 
 
-    print('====================================================================================================')
+    print('==============================================================================================================')
     if is_starting_point:
         print('     Starting point of the sample/optimization routines    ')
     else:
         print('     Statistics on the posterior of the sampler parameters     ')
 
-    print('====================================================================================================')
+    print('==============================================================================================================')
     print()
 
     dict_sampler_summary = {}
@@ -106,12 +106,13 @@ def results_summary(mc, theta,
         print_theta_bounds(model.sampler_parameters, theta, mc.bounds)
 
 
-    print('====================================================================================================')
+
+    print('==============================================================================================================')
     if is_starting_point:
         print('     Starting point projected onto the model parameter space     ')
     else:
         print('     Statistics on the model parameters obtained from the posteriors samples     ')
-    print('====================================================================================================')
+    print('==============================================================================================================')
     print()
 
     dict_parameters_summary = {}
@@ -148,21 +149,21 @@ def results_summary(mc, theta,
             dict_parameters_summary[model_name] = \
             print_dictionary(parameter_values, fixed_warning=fixed_warning)
 
-    print('====================================================================================================')
+    print('==============================================================================================================')
     if is_starting_point:
         print('     Derived parameters obtained from starting point     ')
     else:
         print('     Statistics on the derived parameters obtained from the posteriors samples     ')
-    print('====================================================================================================')
+    print('==============================================================================================================')
     print()
 
     returned_samples, dict_derived_summary = get_planet_parameters(mc, theta, verbose=True)
 
     if compute_lnprob:
         print()
-        print('====================================================================================================')
+        print('==============================================================================================================')
         print('     Statistics on the log-likelihood     ')
-        print('====================================================================================================')
+        print('==============================================================================================================')
         print()
 
         if len(np.shape(theta)) == 2:
@@ -178,9 +179,9 @@ def results_summary(mc, theta,
             print(' LN probability: %12f ' % (mc(theta)))
 
     print()
-    print('====================================================================================================')
-    print('     ------------------------------------------------------------------------------------------     ')
-    print('====================================================================================================')
+    print('==============================================================================================================')
+    print('     ----------------------------------------------------------------------------------------------------     ')
+    print('==============================================================================================================')
     print()
     print()
 
@@ -415,6 +416,23 @@ def get_planet_parameters(mc, theta, verbose=False):
                     (constants.Msjup/constants.Msear)
                 derived_parameters['M_Mj'] = True
 
+            elif 'Me_Ms' in parameter_values.keys() and 'mass' in stellar_parameters.keys():
+
+                parameter_values['M_Me']  = parameter_values['Me_Ms'] * stellar_parameters['mass']
+                derived_parameters['M_Me'] = True
+
+                derived_parameters['K'] = True
+                derived_parameters['K'] = kepler_exo.kepler_compute_rv_semiamplitude(stellar_parameters['mass'],
+                                                              parameter_values['M_Me'] /
+                                                              constants.Msear,
+                                                              parameter_values['P'],
+                                                              parameter_values['i'],
+                                                              parameter_values['e'])
+
+                parameter_values['M_Mj'] = parameter_values['M_Me'] * \
+                    (constants.Msjup/constants.Msear)
+                derived_parameters['M_Mj'] = True
+
 
             if 'Tc' in parameter_values.keys():
                 if 'e' in parameter_values:
@@ -425,6 +443,13 @@ def get_planet_parameters(mc, theta, verbose=False):
                                                                            parameter_values['omega'],
                                                                            parameter_values['Omega'])
 
+                    derived_parameters['Tperi'] = True
+                    parameter_values['Tperi'] = kepler_exo.kepler_compute_deltaTperi_from_deltaTc(
+                        parameter_values['P'],
+                        parameter_values['Tc'] - mc.Tref,
+                        parameter_values['e'],
+                        parameter_values['omega']) + mc.Tref
+
             elif 'mean_long' in parameter_values.keys():
                 derived_parameters['Tc'] = True
                 parameter_values['Tc'] = mc.Tref + kepler_exo.kepler_compute_deltaTc_from_meanlong(parameter_values['P'],
@@ -432,6 +457,16 @@ def get_planet_parameters(mc, theta, verbose=False):
                                                                                   parameter_values['e'],
                                                                                   parameter_values['omega'],
                                                                                   parameter_values['Omega'])
+
+                derived_parameters['Tperi'] = True
+                parameter_values['Tperi'] = kepler_exo.kepler_compute_deltaTperi_from_meanlong(
+                        parameter_values['P'],
+                        parameter_values['mean_long'],
+                        parameter_values['e'],
+                        parameter_values['omega'],
+                        parameter_values['Omega']) + mc.Tref
+
+
 
             if 'R_Rs' in parameter_values.keys() and 'radius' in stellar_parameters.keys():
                 parameter_values['R_Rj'] = parameter_values['R_Rs'] * \
@@ -710,8 +745,11 @@ def get_model(mc, theta, bjd_dict, **kwargs):
                     dataset.external_model = dynamical_output[dataset_name]
                     external_model = dynamical_output_x0[dataset_name].copy()
 
-                    model_out[dataset_name][model_name] = dynamical_output[dataset_name].copy()
-                    model_x0[dataset_name][model_name] = dynamical_output_x0[dataset_name].copy()
+                    model_out[dataset_name][model_name] = 0.
+                    model_x0[dataset_name][model_name] = 0.
+
+                    #model_out[dataset_name][model_name] = dynamical_output[dataset_name].copy()
+                    #model_x0[dataset_name][model_name] = dynamical_output_x0[dataset_name].copy()
 
 
             else:
@@ -756,8 +794,10 @@ def get_model(mc, theta, bjd_dict, **kwargs):
                 dataset.additive_model += model_out[dataset_name][model_name]
                 additive_model += model_x0[dataset_name][model_name]
 
+        
         dataset.compute_model()
         dataset.compute_residuals()
+
 
         model_x0[dataset_name]['complete'] += dataset.compute_model_from_arbitrary_datasets(additive_model,
                                                                                             unitary_model,
@@ -1065,9 +1105,9 @@ def print_theta_bounds(i_dict, theta, bounds):
 
 
 def print_analysis_info(i_dict, bounds, spaces, priors, additional_kind, additonal_pams, fixed_pams):
-    format_string_v1 = '{0:12s}  id:{1:4d}  s:{2:11s} b:[{3:12.4f}, {4:12.4f}]   p:{5:s}  '
-    format_string_v2 = '{0:12s}  derived (no id, space, bound) {1:25s} p:{2:s}  '
-    format_string_v3 = '{0:12s}  fixed (no id, space, bound) {1:27s} p:{2:s}  '
+    format_string_v1 = '{0:26s}  id:{1:4d}  s:{2:11s} b:[{3:12.4f}, {4:12.4f}]   p:{5:s}  '
+    format_string_v2 = '{0:26s}  derived (no id, space, bound) {1:25s} p:{2:s}  '
+    format_string_v3 = '{0:26s}  fixed (no id, space, bound) {1:27s} p:{2:s}  '
     dict_output = {}
 
     for par, i in i_dict.items():

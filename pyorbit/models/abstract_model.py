@@ -94,14 +94,53 @@ class AbstractModel(object):
         self.include_zero_point = False
         self.exclude_zero_point = False
 
-        ## New attribute
+        #TODO: Added in PyORBIT version 12 beta
+        self.parent_model = None
+        self.parameter_values = {}
+        self.planet_parameters = {}
+
+        #TODO: May become obsole in PyORBIT version 12
         self.multiple_planets = []
+
+        #TODO: Added in PyORBIT version 12 beta
+        self.force_model_dataset_initialization = False
+        self.skip_print_info = False
+
+        #NEW:  Added in PyORBIT version 12
+        self.precomputed = False
+
+    def print_warning(self):
+        pass
+
+    def print_info(self):
+        pass
 
     def initialize_model(self, mc, **kwargs):
         pass
 
-    def change_parameter_status(self, mc, **kwargs):
+    def initialize_model_parameters(self, mc, **kwargs):
+        pass
 
+    def initialize_model_dataset(self, mc, dataset, **kwargs):
+        pass
+
+    #** added in PyORBIT version 12
+    # It allows precomputing common grids used by different datasets
+    def precompute(self, parameter_values, dataset):
+        pass
+
+    #** added in PyORBIT version 12
+    # It resets the grid
+    def reset_precompute(self):
+        self.precomputed = False
+        pass
+
+    def change_parameter_status(self, mc, **kwargs):
+        """change_parameter_status _summary_
+
+        :param mc: _description_
+        :type mc: _type_
+        """
         dataset_pams = kwargs.get('dataset_parameters', [])
         for par in dataset_pams:
             self.list_pams_common.discard(par)
@@ -111,8 +150,6 @@ class AbstractModel(object):
             self.list_pams_dataset.discard(par)
             self.list_pams_common.update([par])
 
-    def initialize_model_dataset(self, mc, dataset, **kwargs):
-        pass
 
     def define_parameter_properties(self, ndim, output_lists, dataset_name):
         """[summary]
@@ -187,12 +224,12 @@ class AbstractModel(object):
                         np.log2(self.bounds[dataset_name][par]))
                 elif self.spaces[dataset_name][par] == 'Sine_Angle':
                     self.transformation[dataset_name][par] = get_var_arcsine
-                    output_lists['bounds'].append(
-                        np.sin(self.bounds[dataset_name][par]*constants.deg2rad))
+                    output_lists['bounds'].append(np.sort(
+                        np.sin(self.bounds[dataset_name][par]*constants.deg2rad)))
                 elif self.spaces[dataset_name][par] == 'Cosine_Angle':
                     self.transformation[dataset_name][par] = get_var_arccosine
-                    output_lists['bounds'].append(
-                        np.cos(self.bounds[dataset_name][par]*constants.deg2rad))
+                    output_lists['bounds'].append(np.sort(
+                        np.cos(self.bounds[dataset_name][par]*constants.deg2rad)))
 
                 if par not in self.prior_pams[dataset_name]:
                     self.prior_kind[dataset_name][par] = \

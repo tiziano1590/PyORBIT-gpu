@@ -70,7 +70,7 @@ def pyorbit_ultranest_warmstart(config_in, input_datasets=None, return_output=No
 
     try:
         mc, starting_point, population, prob, sampler_chain, \
-            sampler_lnprobability, _, theta_dict = \
+            sampler_lnprobability, _, theta_dict, prior = \
             emcee_load_from_cpickle(mc.emcee_dir_output)
         reloaded_emcee = True
     except FileNotFoundError:
@@ -95,6 +95,7 @@ def pyorbit_ultranest_warmstart(config_in, input_datasets=None, return_output=No
             dataset.shutdown_jitter()
 
     mc.model_setup()
+    mc.print_model_info()
     if not reloaded_pyde:
         mc.boundaries_setup()
     mc.initialize_logchi2()

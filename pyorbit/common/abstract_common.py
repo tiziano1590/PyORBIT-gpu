@@ -67,6 +67,15 @@ class AbstractCommon(object):
                 self.default_spaces[par_name] = par_dict['spaces']
                 self.default_fixed[par_name] = par_dict['fixed']
 
+        self.skip_print_info = False
+
+
+    def print_warning(self):
+        pass
+
+    def print_info(self):
+        pass
+
     def initialize_model(self, mc, **kwargs):
         pass
 
@@ -148,12 +157,12 @@ class AbstractCommon(object):
                         np.log2(self.bounds[pam]))
                 elif self.spaces[pam] == 'Sine_Angle':
                     self.transformation[pam] = get_var_arcsine
-                    output_lists['bounds'].append(
-                        np.sin(self.bounds[pam]*constants.deg2rad))
+                    output_lists['bounds'].append(np.sort(
+                        np.sin(self.bounds[pam]*constants.deg2rad)))
                 elif self.spaces[pam] == 'Cosine_Angle':
                     self.transformation[pam] = get_var_arccosine
-                    output_lists['bounds'].append(
-                        np.cos(self.bounds[pam]*constants.deg2rad))
+                    output_lists['bounds'].append(np.sort(
+                        np.cos(self.bounds[pam]*constants.deg2rad)))
 
 
                 if pam not in self.prior_pams:
@@ -189,7 +198,7 @@ class AbstractCommon(object):
     def convert_with_name(self, theta, name):
         parameter_values = {}
         for pam in self.parameter_index:
-            parameter_values[name + '_' + pam] = self.transformation[pam](
+            parameter_values[name + '__' + pam] = self.transformation[pam](
                 theta, self.fixed, self.parameter_index[pam])
         return parameter_values
 

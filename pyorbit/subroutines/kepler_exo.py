@@ -5,71 +5,9 @@ from pyorbit.subroutines.common import np
 from scipy.optimize import fsolve, newton
 import pyorbit.subroutines.constants as constants
 
-
-__all__ = ["kepler_K1", "kepler_RV", "kepler_RV_T0P", "kepler_Tc2phase_Tref", "kepler_phase2Tc_Tref", "get_planet_mass", "kepler_true_anomaly_orbital_distance", 
-            "kepler_compute_rv_semiamplitude", "kepler_compute_rv", "kepler_compute_rv_deltabjd", "kepler_compute_deltaTc_from_meanlong",
-            "kepler_compute_meanlong_from_deltaTc", "kepler_compute_deltaTperi_from_deltaTc", "kepler_compute_deltaTc_from_deltaTperi", "kepler_compute_deltaTperi_from_meanlong",
-            "kepler_get_planet_mass", "kepler_compute_trueanomaly_orbitaldistance"]
-
-#TODO: user commented definition below in PyORBIT version 12
-
-#__all__ = ["kepler_compute_rv_semiamplitude", "kepler_compute_rv", "kepler_compute_rv_deltabjd", "kepler_compute_deltaTc_from_meanlong",
-#           "kepler_compute_meanlong_from_deltaTc", "kepler_compute_deltaTperi_from_deltaTc", "kepler_compute_deltaTperi_from_meanlong",
-#           "kepler_get_planet_mass", "kepler_compute_trueanomaly_orbitaldistance"]
-
-def kepler_K1(mass_primary, mass_secondary, period, inclination, eccentricity):
-    """Alias for kepler_compute_rv_semiamplitude, to ensure back-compatibility
-    #TODO: remove in PyORBIT version 12
-    """
-    return kepler_compute_rv_semiamplitude(mass_primary, mass_secondary, period, inclination, eccentricity)
-
-def kepler_RV(bjd, Tperi, period, rv_semiamplitude, ecc, omega_deg):
-    """Alias for kepler_compute_rv, to ensure back-compatibility
-    #TODO:  remove in PyORBIT version 12
-    """
-    return kepler_compute_rv(bjd, Tperi, period, rv_semiamplitude, ecc, omega_deg)
-
-def kepler_RV_T0P(bjd_tref, mean_long, period, rv_semiamplitude, ecc=0., omega_deg=90., Omega_deg=0.0):
-    """Alias for kepler_compute_rv_deltabjd, to ensure back-compatibility
-    #TODO: remove in PyORBIT version 12 
-    """
-    return kepler_compute_rv_deltabjd(bjd_tref, rv_semiamplitude, period, mean_long, ecc, omega_deg, Omega_deg)
-
-def kepler_phase2Tc_Tref(period, mean_long, ecc=0., omega_deg=90., Omega_deg=0.0):
-    """Alias for kepler_compute_deltaTc_from_meanlong, to ensure back-compatibility
-    #TODO: remove in PyORBIT version 12 
-    """
-    return kepler_compute_deltaTc_from_meanlong(period, mean_long, ecc, omega_deg, Omega_deg)
-
-def kepler_Tc2phase_Tref(period, delta_Tc, ecc, omega_deg, Omega_deg=0.0):
-    """Alias for kepler_compute_meanlong_from_deltaTc, to ensure back-compatibility
-    #TODO: remove in PyORBIT version 12 
-    """
-    return kepler_compute_meanlong_from_deltaTc(period, delta_Tc, ecc, omega_deg, Omega_deg)
-
-def kepler_Tc2Tperi_Tref(period, delta_Tc, ecc, omega_deg):
-    """Alias for kepler_compute_meanlong_from_deltaTc, to ensure back-compatibility
-    #TODO: remove in PyORBIT version 12 
-    """
-    return kepler_compute_deltaTperi_from_deltaTc(period, delta_Tc , ecc, omega_deg)
-
-def kepler_phase2Tperi_Tref(period, mean_long, ecc, omega_deg, Omega_deg):
-    """Alias for kepler_compute_meanlong_from_deltaTc, to ensure back-compatibility
-    #TODO: remove in PyORBIT version 12 
-    """
-    return kepler_compute_deltaTperi_from_meanlong(period, mean_long, ecc, omega_deg, Omega_deg)
-
-def get_planet_mass(period, rv_semiamplitude, ecc, mass_star, approximation_limit=30.):
-    """Alias for kepler_get_planet_mass, to ensure back-compatibility
-    #TODO: remove in PyORBIT version 12 
-    """
-    return kepler_get_planet_mass(period, rv_semiamplitude, ecc, mass_star, approximation_limit)
-
-def kepler_true_anomaly_orbital_distance(bjd_tref, delta_Tc, period, ecc, omega_deg, semimajor_axis, Omega_deg=0.0):
-    """Alias for kepler_compute_trueanomaly_orbitaldistance, to ensure back-compatibility
-    #TODO: remove in PyORBIT version 12 
-    """
-    return kepler_compute_trueanomaly_orbitaldistance(bjd_tref, semimajor_axis, delta_Tc, period, ecc, omega_deg, Omega_deg)
+__all__ = ["kepler_E", "kepler_compute_rv_semiamplitude", "kepler_compute_rv", "kepler_compute_rv_deltabjd", "kepler_compute_deltaTc_from_meanlong",
+           "kepler_compute_meanlong_from_deltaTc", "kepler_compute_deltaTperi_from_deltaTc", "kepler_compute_deltaTperi_from_meanlong",
+           "kepler_get_planet_mass", "kepler_compute_trueanomaly_orbitaldistance", "kepler_compute_deltaTc_from_deltaTperi"]
 
 
 def f0_keplerE(ecan_tmp, ecc, mx):
@@ -405,7 +343,7 @@ def get_approximate_mass(period, rv_semiamplitude, ecc, mass_primary):
          * (mass_primary ** (-2. / 3.)))
 
 
-def kepler_get_planet_mass(period, rv_semiamplitude, ecc, mass_star, approximation_limit=30.):
+def kepler_get_planet_mass(period, rv_semiamplitude, ecc, mass_star, approximation_limit=30., verbose=True):
     """ Compute the mass of the planet in Solar mass units, given the orbital period (in days),
     the observed RV semi-amplitude (in m/s), the orbital eccentricity, and the mass of the primary star (in Solar mass units).
     If the approximate mass of the planet (computed under the assumption that the mass of the planet is negligible compared to the mass of the star)
@@ -434,12 +372,14 @@ def kepler_get_planet_mass(period, rv_semiamplitude, ecc, mass_star, approximati
     M_approx = get_approximate_mass(period, rv_semiamplitude, ecc, mass_star)
 
     if np.average(M_approx) > approximation_limit/constants.Msear:
-        print('Computing exact mass of the planet (mean of approximate mass distribution larger than {0:3.1f} Me)'.format(approximation_limit))
+        if verbose:
+            print('Computing exact mass of the planet (mean of approximate mass distribution larger than {0:3.1f} Me)'.format(approximation_limit))
         M_init = np.average(M_approx)
         for i in range(0, n):
             M_approx[i] = fsolve(f_get_mass, np.average(M_init), args=(mass_star[i], period[i], ecc[i], rv_semiamplitude[i]))
     else:
-        print('Computing planetary mass under the approximation M_planet << M_star (threshold at {0:3.1f} Me)'.format(approximation_limit))
+        if verbose:
+            print('Computing planetary mass under the approximation M_planet << M_star (threshold at {0:3.1f} Me)'.format(approximation_limit))
 
     return M_approx
 

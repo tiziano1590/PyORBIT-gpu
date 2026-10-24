@@ -109,10 +109,12 @@ def pyorbit_dynesty(config_in, input_datasets=None, return_output=None, run_nest
 
     if reloaded_dynesty:
         mc.model_setup()
+        mc.print_model_info()
         #mc.boundaries_setup()
         mc.initialize_logchi2()
     else:
         mc.model_setup()
+        mc.print_model_info()
         mc.boundaries_setup()
         mc.initialize_logchi2()
 

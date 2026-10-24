@@ -81,8 +81,9 @@ Versions 10 and 11 are not compatible with the results obtained with previous ve
 Documentation is being updated slowly but steadily, with new pages appearing every week. Below, you can see which pages have been updated recently (last updated: March 2026).
 
 - *Integration with TRADES*
-- *Data modeling*
-  + Planetary RV signal
+- *Radial velocities*
+  + Planetary signals
+- *Additional models*
   + Correlated datasets
   + Gaussian processes regression **updated**
   + Multidimensional GPs **updated**
@@ -129,13 +130,18 @@ prepare_datasets
 prepare_yaml
 running_pyorbit
 common_objects
-models
-transit_models
+radial_velocities
+photometry
+astrometry
 gaussian_process_regression
 multidimensional_gps
 dynamical_analysis
-subroutines
+rossiter_mclaughlin
+detrending_models
+cheops_detrending
+additional_models
 advanced_use
+subroutines
 GitHub Repository <https://github.com/LucaMalavolta/PyORBIT>
 ```
 
