@@ -25,6 +25,7 @@ import os
 import matplotlib as mpl
 import sys
 import multiprocessing
+import threading
 
 from tqdm import tqdm
 
@@ -70,6 +71,36 @@ def _results_worker_evaluate(item):
         _results_worker_operation))
 
 
+def _results_gpu_in_use():
+    """True once this process retargeted JAX to a GPU.
+
+    Importing ``pyorbit.common.gpu_backend`` is side-effect free (JAX is only
+    imported inside its functions), so this is safe to ask in a CPU-only
+    process. Once the GPU path has evaluated any likelihood, JAX's multithreaded
+    C thread pools and a live CUDA context exist in this process, and
+    ``os.fork()`` from here can deadlock or kill the forked children.
+    """
+    try:
+        from pyorbit.common import gpu_backend
+        return bool(gpu_backend.gpu_enabled())
+    except Exception:
+        return False
+
+
+def _results_jax_loaded():
+    """True once JAX has been imported into this process.
+
+    The fork hazard is not limited to the GPU: JAX's XLA runtime runs
+    multithreaded C thread pools that are invisible to
+    ``threading.active_count()``, so a forked child can inherit a locked
+    runtime and deadlock -- even on a pure CPU device. PyORBIT loads JAX for
+    the tinygp GPs even in ``gpu: false`` runs, and the posterior tables
+    (MAP/median) have already evaluated JAX in-process by the time the
+    parallel model phase starts, so this fires there too.
+    """
+    return 'jax' in sys.modules
+
+
 def _results_parallel_map(mc, operation, items, num_processes, mp_method,
                           progress=False, payload=None):
     """Map work with one model-container copy per process and a serial fallback."""
@@ -88,6 +119,26 @@ def _results_parallel_map(mc, operation, items, num_processes, mp_method,
 
     workers = min(num_processes, item_count)
     chunksize = max(1, item_count // (workers * 4))
+
+    # os.fork() after JAX init is a classic deadlock: JAX/XLA runs multithreaded
+    # C thread pools (invisible to threading.active_count()), and a live CUDA
+    # context cannot be inherited by forked children. pyorbit_getresults has
+    # already evaluated JAX likelihoods in-process for the posterior tables
+    # (MAP/median) -- even in `gpu: false` runs, because the tinygp GPs are
+    # JAX-native -- so forking here would hang the pool. 'spawn' workers start
+    # fresh interpreters and rebuild their state from the pickled
+    # `mc`/payload (initargs); the try/except below still falls back to serial
+    # evaluation if the pool cannot be used.
+    if (mp_method == 'fork'
+            and 'spawn' in multiprocessing.get_all_start_methods()
+            and (threading.active_count() > 1
+                 or _results_gpu_in_use()
+                 or _results_jax_loaded())):
+        print('NOTE: this process is multithreaded, has used a GPU, or has '
+              "loaded JAX; 'fork' results workers would deadlock, using "
+              "'spawn' instead of 'fork'")
+        mp_method = 'spawn'
+
     context = multiprocessing.get_context(mp_method)
 
     try:
@@ -2190,12 +2241,12 @@ def pyorbit_getresults(config_in, sampler_name, plot_dictionary):
                                 dir_models + dataset_name + '_' + model_name + '_oversampled.dat', 'w')
 
                             if getattr(mc.models[model_name], 'model_class', False) in transit_oversampled_models:
-                                mc.models[model_name].update_parameter_values(parameter_values, dataset.Tref)
+                                mc.models[model_name].update_parameter_values(parameter_values)
                                 x_range = np.linspace(
                                     -parameter_values['P']/parameter_values['a_Rs'],
                                     parameter_values['P']/parameter_values['a_Rs'], 5000, endpoint=True)
                             elif getattr(mc.models[model_name], 'model_class', False) in eclipse_oversampled_models:
-                                mc.models[model_name].update_parameter_values(parameter_values, dataset.Tref)
+                                mc.models[model_name].update_parameter_values(parameter_values)
                                 x_range = np.linspace(
                                     -parameter_values['P']/parameter_values['a_Rs'],
                                     parameter_values['P']/parameter_values['a_Rs'], 5000, endpoint=True) + 0.5
